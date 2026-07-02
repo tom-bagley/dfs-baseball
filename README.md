@@ -40,6 +40,8 @@ The viewer has one refresh action. Pick a date and click `Refresh`; the server f
 
 Cached FanGraphs sims are written to `out/cache/` by default. Set `CACHE_DIR` to move that cache somewhere else.
 
+After a slate loads, use the `Custom` button on any row to edit that game's batting orders and starting pitchers. The editor starts with FanGraphs' current sim inputs, lets you swap player ids from the loaded sim player list, then sends a custom FanGraphs simulation request and replaces that game in the table with the custom result. Repeated custom payloads are cached under `fangraphs-custom-sims`.
+
 ## Render Hosting
 
 Create a Render Web Service from this repo with:

@@ -87,7 +87,8 @@
     }
 
     input[type="date"],
-    input[type="search"] {
+    input[type="search"],
+    .custom-input {
       border: 1px solid var(--line);
       background: var(--panel);
       color: var(--ink);
@@ -346,6 +347,115 @@
       color: #4a596c;
     }
 
+    .custom-source {
+      background: #e9f7ef;
+      color: #126b3c;
+    }
+
+    .icon-button {
+      min-width: 36px;
+      padding: 0 10px;
+      border-color: var(--line);
+      background: var(--panel);
+      color: var(--ink);
+    }
+
+    .custom-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 10;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      background: rgba(24, 32, 42, 0.36);
+    }
+
+    .custom-overlay.open {
+      display: flex;
+    }
+
+    .custom-dialog {
+      width: min(980px, 100%);
+      max-height: min(840px, calc(100vh - 40px));
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      box-shadow: 0 24px 70px rgba(24, 32, 42, 0.22);
+    }
+
+    .custom-header,
+    .custom-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .custom-footer {
+      border-top: 1px solid var(--line);
+      border-bottom: 0;
+      justify-content: flex-end;
+    }
+
+    .custom-title {
+      margin: 0;
+      font-size: 1rem;
+      line-height: 1.2;
+    }
+
+    .custom-body {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+      padding: 16px;
+    }
+
+    .custom-side {
+      min-width: 0;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 12px;
+    }
+
+    .custom-side h3 {
+      margin: 0 0 10px;
+      font-size: 0.95rem;
+    }
+
+    .custom-row {
+      display: grid;
+      grid-template-columns: 54px minmax(0, 1fr);
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .custom-row strong {
+      color: var(--muted);
+      font-size: 0.78rem;
+      font-weight: 850;
+    }
+
+    .custom-input {
+      width: 100%;
+      min-height: 36px;
+      border-radius: 6px;
+      font: inherit;
+      font-size: 0.88rem;
+    }
+
+    .custom-section-label {
+      margin: 12px 0 8px;
+      color: var(--muted);
+      font-size: 0.76rem;
+      font-weight: 850;
+      text-transform: uppercase;
+    }
+
     .empty {
       padding: 34px 18px;
       color: var(--muted);
@@ -376,6 +486,10 @@
 
       .toolbar {
         grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .custom-body {
+        grid-template-columns: 1fr;
       }
 
       .search {
@@ -457,14 +571,29 @@
               <th data-sort-key="oddsProvider">Provider</th>
               <th data-sort-key="projectionSystem">Projection</th>
               <th data-sort-key="status">Status</th>
+              <th>Custom</th>
             </tr>
           </thead>
           <tbody id="tableBody">
-            <tr><td class="empty" colspan="17">No projections loaded yet.</td></tr>
+            <tr><td class="empty" colspan="18">No projections loaded yet.</td></tr>
           </tbody>
         </table>
       </div>
     </section>
+
+    <div id="customOverlay" class="custom-overlay" aria-hidden="true">
+      <div class="custom-dialog" role="dialog" aria-modal="true" aria-labelledby="customTitle">
+        <div class="custom-header">
+          <h2 id="customTitle" class="custom-title">Custom Projection</h2>
+          <button id="customCloseButton" class="icon-button" type="button" title="Close">x</button>
+        </div>
+        <div id="customBody" class="custom-body"></div>
+        <div class="custom-footer">
+          <button id="customCancelButton" class="secondary" type="button">Cancel</button>
+          <button id="customRunButton" class="primary" type="button">Run Custom</button>
+        </div>
+      </div>
+    </div>
   </main>
 
   <script>
@@ -475,6 +604,8 @@
       sortDirection: "desc",
       refreshedAt: "",
       cache: null,
+      gamesByKey: new Map(),
+      activeCustomGame: null,
     };
 
     const dateInput = document.querySelector("#dateInput");
@@ -487,6 +618,12 @@
     const runsMetric = document.querySelector("#runsMetric");
     const favoriteMetric = document.querySelector("#favoriteMetric");
     const headers = [...document.querySelectorAll("th[data-sort-key]")];
+    const customOverlay = document.querySelector("#customOverlay");
+    const customTitle = document.querySelector("#customTitle");
+    const customBody = document.querySelector("#customBody");
+    const customCloseButton = document.querySelector("#customCloseButton");
+    const customCancelButton = document.querySelector("#customCancelButton");
+    const customRunButton = document.querySelector("#customRunButton");
 
     dateInput.value = localDateString(new Date());
 
@@ -497,6 +634,13 @@
     searchInput.addEventListener("input", () => {
       applyFilterAndSort();
       renderTable();
+    });
+
+    customCloseButton.addEventListener("click", closeCustomEditor);
+    customCancelButton.addEventListener("click", closeCustomEditor);
+    customRunButton.addEventListener("click", runCustomProjection);
+    customOverlay.addEventListener("click", (event) => {
+      if (event.target === customOverlay) closeCustomEditor();
     });
 
     headers.forEach((header) => {
@@ -551,6 +695,8 @@
       state.rows = teamRows;
       state.refreshedAt = result.refreshedAt || "";
       state.cache = result.cache || null;
+      state.gamesByKey = indexGames(result.games || []);
+      state.activeCustomGame = null;
       searchInput.value = "";
       applyFilterAndSort();
       renderMetrics();
@@ -599,7 +745,7 @@
 
     function renderTable() {
       if (!state.filteredRows.length) {
-        tableBody.innerHTML = `<tr><td class="empty" colspan="17">${state.rows.length ? "No teams match that filter." : "No projections loaded yet."}</td></tr>`;
+        tableBody.innerHTML = `<tr><td class="empty" colspan="18">${state.rows.length ? "No teams match that filter." : "No projections loaded yet."}</td></tr>`;
         return;
       }
 
@@ -622,8 +768,226 @@
           <td>${escapeHtml(row.oddsProvider || row.oddsError || "")}</td>
           <td>${escapeHtml(row.projectionSystem)}</td>
           <td>${escapeHtml(row.status)}</td>
+          <td><button class="icon-button" type="button" data-custom-game="${escapeHtml(row.gameKey)}" title="Edit lineup and starter">Custom</button></td>
         </tr>
       `).join("");
+
+      tableBody.querySelectorAll("[data-custom-game]").forEach((button) => {
+        button.addEventListener("click", () => openCustomEditor(button.dataset.customGame));
+      });
+    }
+
+    function openCustomEditor(gameKey) {
+      const game = state.gamesByKey.get(String(gameKey));
+      if (!game?.customInput) {
+        setStatus("Custom inputs are unavailable for that game until the FanGraphs sim loads.", true);
+        return;
+      }
+
+      state.activeCustomGame = clone(game.customInput);
+      customTitle.textContent = `${state.activeCustomGame.awayTeamAbbrev} @ ${state.activeCustomGame.homeTeamAbbrev}`;
+      renderCustomEditor();
+      customOverlay.classList.add("open");
+      customOverlay.setAttribute("aria-hidden", "false");
+    }
+
+    function closeCustomEditor() {
+      state.activeCustomGame = null;
+      customOverlay.classList.remove("open");
+      customOverlay.setAttribute("aria-hidden", "true");
+      customBody.innerHTML = "";
+    }
+
+    function renderCustomEditor() {
+      const game = state.activeCustomGame;
+      if (!game) return;
+
+      customBody.innerHTML = `
+        ${playerDatalist(game)}
+        ${customSideHtml("away", game)}
+        ${customSideHtml("home", game)}
+      `;
+    }
+
+    function customSideHtml(side, game) {
+      const lineup = game[side] || {};
+      const teamName = side === "away" ? game.awayTeamName : game.homeTeamName;
+      const teamAbbrev = side === "away" ? game.awayTeamAbbrev : game.homeTeamAbbrev;
+      const battingOrder = padBattingOrder(lineup.battingOrder || []);
+
+      return `
+        <section class="custom-side" data-side="${side}">
+          <h3>${escapeHtml(teamAbbrev || teamName)}</h3>
+          <div class="custom-section-label">Batting Order</div>
+          ${battingOrder.map((slot, index) => `
+            <label class="custom-row">
+              <strong>${index + 1}. ${escapeHtml(slot.position || "")}</strong>
+              <input class="custom-input" data-custom-field="batter" data-side="${side}" data-index="${index}" list="customPlayers" value="${escapeHtml(slot.playerId || "")}" placeholder="${escapeHtml(slot.name || "Player ID")}">
+            </label>
+          `).join("")}
+          <div class="custom-section-label">Starter</div>
+          <label class="custom-row">
+            <strong>SP</strong>
+            <input class="custom-input" data-custom-field="starter" data-side="${side}" list="customPlayers" value="${escapeHtml(lineup.startingPitcher || "")}" placeholder="${escapeHtml(lineup.startingPitcherName || "Player ID")}">
+          </label>
+        </section>
+      `;
+    }
+
+    function playerDatalist(game) {
+      const seen = new Set();
+      const options = (game.players?.all || [])
+        .filter((player) => {
+          if (!player.playerId || seen.has(player.playerId)) return false;
+          seen.add(player.playerId);
+          return true;
+        })
+        .sort((a, b) => String(a.name).localeCompare(String(b.name)))
+        .map((player) => {
+          const meta = [player.name, player.team, player.position || player.role].filter(Boolean).join(" - ");
+          return `<option value="${escapeHtml(player.playerId)}" label="${escapeHtml(meta)}"></option>`;
+        })
+        .join("");
+
+      return `<datalist id="customPlayers">${options}</datalist>`;
+    }
+
+    async function runCustomProjection() {
+      const game = state.activeCustomGame;
+      if (!game) return;
+
+      try {
+        customRunButton.disabled = true;
+        customRunButton.textContent = "Running...";
+        readCustomEditorIntoGame(game);
+        const payload = buildCustomPayload(game);
+        const result = await customProjectionRequest(game, payload);
+        applyCustomProjectionRows(result);
+        closeCustomEditor();
+      } catch (error) {
+        setStatus(`Could not run custom projection. ${formatError(error)}`, true);
+      } finally {
+        customRunButton.disabled = false;
+        customRunButton.textContent = "Run Custom";
+      }
+    }
+
+    function readCustomEditorIntoGame(game) {
+      customBody.querySelectorAll("[data-custom-field='batter']").forEach((input) => {
+        const side = input.dataset.side;
+        const index = Number(input.dataset.index);
+        const lineup = game[side];
+        if (!lineup?.battingOrder?.[index]) return;
+        lineup.battingOrder[index].playerId = resolvePlayerId(input.value, game);
+      });
+
+      customBody.querySelectorAll("[data-custom-field='starter']").forEach((input) => {
+        const side = input.dataset.side;
+        const lineup = game[side];
+        if (!lineup) return;
+        lineup.startingPitcher = resolvePlayerId(input.value, game);
+      });
+    }
+
+    function buildCustomPayload(game) {
+      return {
+        homeTeamId: game.homeTeamId,
+        awayTeamId: game.awayTeamId,
+        projectionSystem: game.projectionSystem || "rSteamer",
+        playerIdType: "upid",
+        extraInningsGhostRunner: true,
+        forceCompleteGame: false,
+        threeBatterMinimum: true,
+        hfa: { enabled: false },
+        home: customPayloadLineup(game.home),
+        away: customPayloadLineup(game.away),
+      };
+    }
+
+    function customPayloadLineup(lineup) {
+      const payload = {
+        battingOrder: padBattingOrder(lineup.battingOrder || []).map((slot) => ({
+          position: slot.position || "",
+          playerId: slot.playerId || "",
+        })),
+        bullpen: (lineup.bullpen || []).map((pitcher) => ({
+          role: pitcher.role || "Middle Reliever",
+          playerId: pitcher.playerId || "",
+        })),
+      };
+
+      if (lineup.lineupSource) payload.lineupSource = lineup.lineupSource;
+      if (lineup.startingPitcher) payload.startingPitcher = { playerId: lineup.startingPitcher };
+      if (lineup.opener) payload.opener = { playerId: lineup.opener };
+      return payload;
+    }
+
+    async function customProjectionRequest(game, payload) {
+      const response = await fetch("/api/run-custom-projection", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          date: game.date,
+          gameKey: game.gameKey,
+          lineType: "current",
+          payload,
+        }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(result.error || `HTTP ${response.status}`);
+      }
+      return result;
+    }
+
+    function applyCustomProjectionRows(result) {
+      const rows = Array.isArray(result.rows) ? result.rows : [];
+      if (!rows.length) {
+        setStatus("FanGraphs returned the custom sim, but no team rows were found.", true);
+        return;
+      }
+
+      const gameKey = rows[0].gameKey;
+      state.rows = state.rows.map((row) => (row.gameKey === gameKey ? rows.find((customRow) => customRow.side === row.side) || row : row));
+      if (result.game?.customInput) {
+        state.gamesByKey.set(String(gameKey), result.game);
+      }
+      applyFilterAndSort();
+      renderMetrics();
+      renderTable();
+      setStatus(`Loaded custom projection for ${rows.map((row) => row.teamAbbrev).join(" @ ")}.`);
+    }
+
+    function indexGames(games) {
+      const index = new Map();
+      for (const game of games) {
+        const key = game.mlbGameId || game.gameId || game.customInput?.gameKey;
+        if (key) index.set(String(key), game);
+      }
+      return index;
+    }
+
+    function resolvePlayerId(value, game) {
+      const trimmed = String(value || "").trim();
+      if (!trimmed) return "";
+      const players = game.players?.all || [];
+      const exactId = players.find((player) => String(player.playerId) === trimmed);
+      if (exactId) return exactId.playerId;
+      const exactName = players.find((player) => String(player.name || "").toLowerCase() === trimmed.toLowerCase());
+      return exactName?.playerId || trimmed;
+    }
+
+    function padBattingOrder(order) {
+      const positions = ["CF", "SS", "RF", "1B", "DH", "3B", "C", "LF", "2B"];
+      return Array.from({ length: 9 }, (_, index) => ({
+        position: order[index]?.position || positions[index],
+        playerId: order[index]?.playerId || "",
+        name: order[index]?.name || "",
+      }));
+    }
+
+    function clone(value) {
+      return JSON.parse(JSON.stringify(value));
     }
 
     function renderMetrics() {
@@ -696,6 +1060,7 @@
       const normalized = String(value || "").toLowerCase();
       if (normalized === "confirmed") return "confirmed";
       if (normalized === "projected") return "projected";
+      if (normalized === "custom") return "custom-source";
       return "";
     }
 

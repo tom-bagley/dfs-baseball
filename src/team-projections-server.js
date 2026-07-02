@@ -3,7 +3,7 @@ import { stat } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { extname, normalize, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { getProjectionSlate } from './projections-data.js';
+import { getProjectionSlate, runCustomProjection } from './projections-data.js';
 
 const PORT = Number(process.env.PORT || 8000);
 const MAX_PORT_ATTEMPTS = 10;
@@ -27,6 +27,11 @@ const server = createServer(async (request, response) => {
 
     if (request.method === 'POST' && url.pathname === '/api/refresh-projections') {
       await handleRefreshProjections(request, response);
+      return;
+    }
+
+    if (request.method === 'POST' && url.pathname === '/api/run-custom-projection') {
+      await handleRunCustomProjection(request, response);
       return;
     }
 
@@ -79,6 +84,41 @@ async function handleRefreshProjections(request, response) {
       error: formatError(error),
       phase: 'refresh',
       hint: 'The server is running, but an upstream FanGraphs or ESPN request failed.',
+    });
+  }
+}
+
+async function handleRunCustomProjection(request, response) {
+  const body = await readJsonBody(request);
+  const date = String(body.date || '').trim();
+  const gameKey = String(body.gameKey || '').trim();
+  const providerName = String(body.provider || '').trim();
+  const lineType = String(body.lineType || 'current').trim();
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    sendJson(response, 400, { error: 'Use a date in YYYY-MM-DD format.' });
+    return;
+  }
+
+  if (!gameKey) {
+    sendJson(response, 400, { error: 'Select a game before running a custom projection.' });
+    return;
+  }
+
+  try {
+    const result = await runCustomProjection({
+      date,
+      gameKey,
+      payload: body.payload,
+      providerName,
+      lineType,
+    });
+    sendJson(response, 200, result);
+  } catch (error) {
+    sendJson(response, 502, {
+      error: formatError(error),
+      phase: 'custom-projection',
+      hint: 'The server is running, but FanGraphs did not return a custom simulation.',
     });
   }
 }

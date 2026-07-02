@@ -2,6 +2,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createHash } from 'node:crypto';
 
 const ROOT = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const CACHE_ROOT = resolve(process.env.CACHE_DIR || join(ROOT, 'out', 'cache'));
@@ -76,7 +77,11 @@ export async function getProjectionSlate({
       error = 'No MLBGameId or team ids were available for this schedule row.';
     }
 
-    gameRows.push(buildGameRow({ date, game, simId, projectionSystem, sim, error, schedule, scores }));
+    const gameRow = buildGameRow({ date, game, simId, projectionSystem, sim, error, schedule, scores });
+    if (sim) {
+      gameRow.customInput = buildCustomInput({ date, game, simId, projectionSystem, sim, schedule });
+    }
+    gameRows.push(gameRow);
   }
 
   const teamRows = gameRows.flatMap(gameToTeamRows);
@@ -181,6 +186,102 @@ async function fetchGameSimulation(simId, projectionSystem) {
   });
 }
 
+export async function runCustomProjection({
+  date,
+  gameKey,
+  payload,
+  providerName = '',
+  lineType = DEFAULT_LINE_TYPE,
+} = {}) {
+  validateDate(date);
+  if (!payload || typeof payload !== 'object') {
+    throw new Error('Custom simulation payload is required.');
+  }
+
+  const games = await fetchFangraphsGames(date);
+  const game = findGameByKey(games, gameKey, date);
+  if (!game) {
+    throw new Error('Could not find the selected game for that date.');
+  }
+
+  const schedule = game.schedule || {};
+  const scores = game.scores || {};
+  const projectionSystem = payload.projectionSystem || DEFAULT_PROJECTION_SYSTEM;
+  const payloadHash = hashJson(payload);
+  const cachePath = customSimCachePath(projectionSystem, payloadHash);
+  const cached = await getCachedJson(cachePath);
+  const sim = cached || await fetchCustomSimulation(payload);
+  if (!cached) {
+    await writeCachedJson(cachePath, sim);
+  }
+
+  const simId = sim?.shortCode || sim?.simId || `custom-${payloadHash.slice(0, 12)}`;
+  const gameRow = buildGameRow({ date, game, simId, projectionSystem, sim, error: '', schedule, scores });
+  gameRow.custom = true;
+  gameRow.customHash = payloadHash;
+
+  const rows = gameToTeamRows(gameRow);
+  rows.forEach((row) => {
+    row.lineupSource = 'custom';
+    row.custom = true;
+  });
+
+  const oddsRows = await getOddsRows({
+    date,
+    games: buildGamesPayload(rows),
+    providerName,
+    lineType,
+    cacheStats: {},
+  });
+  mergeOdds(rows, oddsRows);
+
+  return {
+    ok: true,
+    date,
+    gameKey,
+    projectionSystem,
+    simId,
+    rows,
+    game: {
+      ...gameRow,
+      customInput: buildCustomInput({ date, game, simId, projectionSystem, sim, schedule }),
+    },
+    cache: { customSim: cached ? 'hit' : 'miss' },
+    refreshedAt: new Date().toISOString(),
+  };
+}
+
+async function fetchCustomSimulation(payload) {
+  const url = new URL(`${SIM_BASE_URL}/custom-game`);
+  url.searchParams.set('idType', 'upid');
+
+  const data = await fetchJson(url, {
+    accept: 'application/json, text/plain, */*',
+    'content-type': 'application/json',
+    'user-agent': 'dfs-baseball-projections/1.0',
+    referer: `${FANGRAPHS_BASE_URL}/lab/baseball-sim`,
+  }, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+
+  if (data?.shortCode && (data.homeWinPct == null || !data.home || !data.away)) {
+    return fetchCustomSimulationResult(data.shortCode);
+  }
+
+  return data;
+}
+
+async function fetchCustomSimulationResult(shortCode) {
+  const url = new URL(`${SIM_BASE_URL}/custom-game-json/${encodeURIComponent(shortCode)}`);
+  url.searchParams.set('idType', 'upid');
+  return fetchJson(url, {
+    accept: 'application/json, text/plain, */*',
+    'user-agent': 'dfs-baseball-projections/1.0',
+    referer: `${FANGRAPHS_BASE_URL}/lab/baseball-sim`,
+  });
+}
+
 async function fetchEspnEvents(date) {
   const url = new URL(ESPN_SCOREBOARD_URL);
   url.searchParams.set('dates', date.replaceAll('-', ''));
@@ -206,8 +307,8 @@ async function fetchEspnOdds(eventId, competitionId, providerName) {
     : items[0];
 }
 
-async function fetchJson(url, headers = {}) {
-  const response = await fetch(url, { headers });
+async function fetchJson(url, headers = {}, options = {}) {
+  const response = await fetch(url, { headers, ...options });
 
   if (!response.ok) {
     const body = await response.text().catch(() => '');
@@ -265,6 +366,104 @@ function buildGameRow({ date, game, simId, projectionSystem, sim, error, schedul
   };
 }
 
+function buildCustomInput({ date, game, simId, projectionSystem, sim, schedule }) {
+  const gameRow = buildGameRow({
+    date,
+    game,
+    simId,
+    projectionSystem,
+    sim,
+    error: '',
+    schedule,
+    scores: game.scores || {},
+  });
+
+  return {
+    gameKey: gameRow.mlbGameId || gameRow.gameId || `${date}-${gameRow.awayTeamAbbrev}-${gameRow.homeTeamAbbrev}`,
+    date,
+    gameId: gameRow.gameId,
+    mlbGameId: gameRow.mlbGameId,
+    projectionSystem,
+    homeTeamId: String(gameRow.homeTeamId || sim?.homeTeam?.id || ''),
+    awayTeamId: String(gameRow.awayTeamId || sim?.awayTeam?.id || ''),
+    homeTeamName: gameRow.homeTeam,
+    awayTeamName: gameRow.awayTeam,
+    homeTeamAbbrev: gameRow.homeTeamAbbrev,
+    awayTeamAbbrev: gameRow.awayTeamAbbrev,
+    home: lineupFromSimSide(sim?.home),
+    away: lineupFromSimSide(sim?.away),
+    players: playersFromSim(sim),
+  };
+}
+
+function lineupFromSimSide(side = {}) {
+  const batters = Array.isArray(side?.batters) ? side.batters : [];
+  const pitchers = Array.isArray(side?.pitchers) ? side.pitchers : [];
+  const starter = getStartingPitcher(side);
+  const opener = pitchers.find((pitcher) => String(pitcher.role || '').toLowerCase() === 'opener') || {};
+  const bullpen = pitchers
+    .filter((pitcher) => {
+      const role = String(pitcher.role || '').toLowerCase();
+      return role !== 'starter' && role !== 'primary pitcher' && role !== 'opener';
+    })
+    .map((pitcher) => ({
+      role: pitcher.role || 'Middle Reliever',
+      playerId: stringifyId(pitcher.playerId),
+      name: pitcher.name || '',
+    }));
+
+  return {
+    lineupSource: side.lineupSource || '',
+    battingOrder: batters.slice(0, 9).map((batter, index) => ({
+      position: batter.position || defaultPositions()[index] || '',
+      playerId: stringifyId(batter.playerId),
+      name: batter.name || '',
+    })),
+    startingPitcher: stringifyId(starter.playerId),
+    startingPitcherName: starter.name || '',
+    opener: stringifyId(opener.playerId),
+    openerName: opener.name || '',
+    bullpen,
+  };
+}
+
+function playersFromSim(sim = {}) {
+  return {
+    batters: [
+      ...sidePlayers(sim?.away, 'batter', sim?.awayTeam, sim?.homeTeam),
+      ...sidePlayers(sim?.home, 'batter', sim?.homeTeam, sim?.awayTeam),
+    ],
+    pitchers: [
+      ...sidePlayers(sim?.away, 'pitcher', sim?.awayTeam, sim?.homeTeam),
+      ...sidePlayers(sim?.home, 'pitcher', sim?.homeTeam, sim?.awayTeam),
+    ],
+    all: [
+      ...sidePlayers(sim?.away, 'batter', sim?.awayTeam, sim?.homeTeam),
+      ...sidePlayers(sim?.home, 'batter', sim?.homeTeam, sim?.awayTeam),
+      ...sidePlayers(sim?.away, 'pitcher', sim?.awayTeam, sim?.homeTeam),
+      ...sidePlayers(sim?.home, 'pitcher', sim?.homeTeam, sim?.awayTeam),
+    ],
+  };
+}
+
+function sidePlayers(side = {}, type, teamInfo = {}, opponentInfo = {}) {
+  const list = type === 'pitcher' ? side?.pitchers : side?.batters;
+  if (!Array.isArray(list)) return [];
+  return list
+    .filter((player) => player?.playerId)
+    .map((player) => ({
+      playerId: stringifyId(player.playerId),
+      name: player.name || '',
+      position: player.position || '',
+      role: player.role || '',
+      type,
+      teamId: stringifyId(teamInfo?.id || side?.teamId),
+      team: teamInfo?.name || side?.name || '',
+      opponentId: stringifyId(opponentInfo?.id),
+      opponent: opponentInfo?.name || '',
+    }));
+}
+
 function gameToTeamRows(game) {
   const gameKey = game.mlbGameId || game.gameId || `${game.date}-${game.awayTeamAbbrev}-${game.homeTeamAbbrev}`;
   const common = {
@@ -310,6 +509,16 @@ function gameToTeamRows(game) {
       moneyline: numberOrNull(game.homeMoneyline),
     },
   ].filter((row) => row.teamName);
+}
+
+function findGameByKey(games, gameKey, date) {
+  const target = String(gameKey || '');
+  return games.find((game) => {
+    const schedule = game.schedule || {};
+    const key = schedule.MLBGameId ?? game.MLBGameId ?? schedule.GameId ?? game.GameId
+      ?? `${date}-${schedule.AwayTeamAbbName || ''}-${schedule.HomeTeamAbbName || ''}`;
+    return String(key) === target;
+  });
 }
 
 function buildGamesPayload(rows) {
@@ -471,8 +680,24 @@ function simCachePath(projectionSystem, simId) {
   return join(CACHE_ROOT, 'fangraphs-sims', safeSegment(projectionSystem), `${safeSegment(simId)}.json`);
 }
 
+function customSimCachePath(projectionSystem, hash) {
+  return join(CACHE_ROOT, 'fangraphs-custom-sims', safeSegment(projectionSystem), `${safeSegment(hash)}.json`);
+}
+
+function hashJson(value) {
+  return createHash('sha256').update(JSON.stringify(value)).digest('hex');
+}
+
 function safeSegment(value) {
   return encodeURIComponent(String(value || 'unknown')).replaceAll('%', '_');
+}
+
+function stringifyId(value) {
+  return value == null || value === '' ? '' : String(value);
+}
+
+function defaultPositions() {
+  return ['CF', 'SS', 'RF', '1B', 'DH', '3B', 'C', 'LF', '2B'];
 }
 
 function numberOrNull(value) {

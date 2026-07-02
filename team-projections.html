@@ -62,6 +62,33 @@
       font-size: 0.98rem;
     }
 
+    .view-tabs {
+      display: inline-flex;
+      gap: 4px;
+      margin-bottom: 12px;
+      padding: 4px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+    }
+
+    .view-tabs a {
+      display: inline-flex;
+      align-items: center;
+      min-height: 32px;
+      padding: 0 12px;
+      border-radius: 6px;
+      color: var(--muted);
+      font-size: 0.88rem;
+      font-weight: 800;
+      text-decoration: none;
+    }
+
+    .view-tabs a.active {
+      background: var(--accent);
+      color: #fff;
+    }
+
     .controls {
       display: flex;
       flex-wrap: wrap;
@@ -505,11 +532,25 @@
       .toolbar {
         grid-template-columns: 1fr;
       }
+
+      .view-tabs {
+        width: 100%;
+      }
+
+      .view-tabs a {
+        flex: 1;
+        justify-content: center;
+      }
     }
   </style>
 </head>
 <body>
   <main>
+    <nav class="view-tabs" aria-label="Projection pages">
+      <a href="/" class="active" aria-current="page">Teams</a>
+      <a href="/player-projections.html">Players</a>
+    </nav>
+
     <header>
       <div>
         <h1>MLB Team Projections</h1>
@@ -822,21 +863,28 @@
           ${battingOrder.map((slot, index) => `
             <label class="custom-row">
               <strong>${index + 1}. ${escapeHtml(slot.position || "")}</strong>
-              <input class="custom-input" data-custom-field="batter" data-side="${side}" data-index="${index}" list="customPlayers" value="${escapeHtml(slot.playerId || "")}" placeholder="${escapeHtml(slot.name || "Player ID")}">
+              <input class="custom-input" data-custom-field="batter" data-side="${side}" data-index="${index}" list="customBatters" value="${escapeHtml(playerDisplayValue(slot))}" placeholder="Player name">
             </label>
           `).join("")}
           <div class="custom-section-label">Starter</div>
           <label class="custom-row">
             <strong>SP</strong>
-            <input class="custom-input" data-custom-field="starter" data-side="${side}" list="customPlayers" value="${escapeHtml(lineup.startingPitcher || "")}" placeholder="${escapeHtml(lineup.startingPitcherName || "Player ID")}">
+            <input class="custom-input" data-custom-field="starter" data-side="${side}" list="customPitchers" value="${escapeHtml(playerDisplayValue({ playerId: lineup.startingPitcher, name: lineup.startingPitcherName }))}" placeholder="Pitcher name">
           </label>
         </section>
       `;
     }
 
     function playerDatalist(game) {
+      return `
+        <datalist id="customBatters">${playerOptions(game.players?.batters || [])}</datalist>
+        <datalist id="customPitchers">${playerOptions(game.players?.pitchers || [])}</datalist>
+      `;
+    }
+
+    function playerOptions(players) {
       const seen = new Set();
-      const options = (game.players?.all || [])
+      return players
         .filter((player) => {
           if (!player.playerId || seen.has(player.playerId)) return false;
           seen.add(player.playerId);
@@ -844,12 +892,11 @@
         })
         .sort((a, b) => String(a.name).localeCompare(String(b.name)))
         .map((player) => {
-          const meta = [player.name, player.team, player.position || player.role].filter(Boolean).join(" - ");
-          return `<option value="${escapeHtml(player.playerId)}" label="${escapeHtml(meta)}"></option>`;
+          const value = playerDisplayValue(player);
+          const label = [player.team, player.position || player.role, player.playerId].filter(Boolean).join(" - ");
+          return `<option value="${escapeHtml(value)}" label="${escapeHtml(label)}"></option>`;
         })
         .join("");
-
-      return `<datalist id="customPlayers">${options}</datalist>`;
     }
 
     async function runCustomProjection() {
@@ -971,10 +1018,17 @@
       const trimmed = String(value || "").trim();
       if (!trimmed) return "";
       const players = game.players?.all || [];
+      const bracketMatch = trimmed.match(/\[([^\]]+)\]\s*$/);
+      if (bracketMatch) return bracketMatch[1].trim();
       const exactId = players.find((player) => String(player.playerId) === trimmed);
       if (exactId) return exactId.playerId;
       const exactName = players.find((player) => String(player.name || "").toLowerCase() === trimmed.toLowerCase());
       return exactName?.playerId || trimmed;
+    }
+
+    function playerDisplayValue(player) {
+      if (!player?.playerId) return "";
+      return player.name ? `${player.name} [${player.playerId}]` : String(player.playerId);
     }
 
     function padBattingOrder(order) {

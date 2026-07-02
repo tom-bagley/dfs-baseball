@@ -36,9 +36,11 @@ http://localhost:8000/
 
 If port 8000 is already in use, the viewer automatically tries the next port. Open the localhost URL printed in the terminal.
 
-The viewer has one refresh action. Pick a date and click `Refresh`; the server fetches the FanGraphs schedule for that date, reuses any cached simulation payloads it already has, fetches only new simulation ids, joins fresh ESPN odds, and returns table-ready JSON to the page. CSV exports still exist as command-line tools, but the app no longer depends on CSV files for normal use.
+The viewer has Teams and Players pages. Pick a date and click `Refresh`; the server fetches the FanGraphs schedule for that date, reuses any cached simulation payloads it already has, fetches only new simulation ids, and returns table-ready JSON to the page. The Teams page also joins fresh ESPN odds. CSV exports still exist as command-line tools, but the app no longer depends on CSV files for normal use.
 
 Cached FanGraphs sims are written to `out/cache/` by default. Set `CACHE_DIR` to move that cache somewhere else.
+
+On the Players page, use `DK CSV` to import a DraftKings salary export for the selected date. Imported salaries are cached by date, joined to player projections on refresh, and shown as salary/value columns.
 
 After a slate loads, use the `Custom` button on any row to edit that game's batting orders and starting pitchers. The editor starts with FanGraphs' current sim inputs, lets you swap player ids from the loaded sim player list, then sends a custom FanGraphs simulation request and replaces that game in the table with the custom result. Repeated custom payloads are cached under `fangraphs-custom-sims`.
 

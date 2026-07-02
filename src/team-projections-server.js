@@ -3,10 +3,16 @@ import { stat } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { extname, normalize, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { getProjectionSlate, runCustomProjection } from './projections-data.js';
+import {
+  getPlayerProjectionSlate,
+  getProjectionSlate,
+  importDraftKingsSalaries,
+  runCustomProjection,
+} from './projections-data.js';
 
 const PORT = Number(process.env.PORT || 8000);
 const MAX_PORT_ATTEMPTS = 10;
+const MAX_JSON_BODY_BYTES = 2_500_000;
 const ROOT = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const MIME_TYPES = {
   '.csv': 'text/csv; charset=utf-8',
@@ -27,6 +33,16 @@ const server = createServer(async (request, response) => {
 
     if (request.method === 'POST' && url.pathname === '/api/refresh-projections') {
       await handleRefreshProjections(request, response);
+      return;
+    }
+
+    if (request.method === 'POST' && url.pathname === '/api/refresh-player-projections') {
+      await handleRefreshPlayerProjections(request, response);
+      return;
+    }
+
+    if (request.method === 'POST' && url.pathname === '/api/import-draftkings-salaries') {
+      await handleImportDraftKingsSalaries(request, response);
       return;
     }
 
@@ -84,6 +100,54 @@ async function handleRefreshProjections(request, response) {
       error: formatError(error),
       phase: 'refresh',
       hint: 'The server is running, but an upstream FanGraphs or ESPN request failed.',
+    });
+  }
+}
+
+async function handleRefreshPlayerProjections(request, response) {
+  const body = await readJsonBody(request);
+  const date = String(body.date || '').trim();
+  const projectionSystem = String(body.projectionSystem || 'rSteamer').trim();
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    sendJson(response, 400, { error: 'Use a date in YYYY-MM-DD format.' });
+    return;
+  }
+
+  try {
+    const slate = await getPlayerProjectionSlate({ date, projectionSystem });
+    sendJson(response, 200, slate);
+  } catch (error) {
+    sendJson(response, 502, {
+      error: formatError(error),
+      phase: 'player-refresh',
+      hint: 'The server is running, but an upstream FanGraphs request failed.',
+    });
+  }
+}
+
+async function handleImportDraftKingsSalaries(request, response) {
+  const body = await readJsonBody(request);
+  const date = String(body.date || '').trim();
+  const csvText = String(body.csvText || '');
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    sendJson(response, 400, { error: 'Use a date in YYYY-MM-DD format.' });
+    return;
+  }
+
+  if (!csvText.trim()) {
+    sendJson(response, 400, { error: 'Choose a DraftKings salary CSV before importing.' });
+    return;
+  }
+
+  try {
+    const result = await importDraftKingsSalaries({ date, csvText });
+    sendJson(response, 200, result);
+  } catch (error) {
+    sendJson(response, 400, {
+      error: formatError(error),
+      phase: 'draftkings-import',
     });
   }
 }
@@ -160,7 +224,7 @@ function readJsonBody(request) {
 
     request.on('data', (chunk) => {
       body += chunk;
-      if (body.length > 10_000) {
+      if (body.length > MAX_JSON_BODY_BYTES) {
         reject(new Error('Request body is too large.'));
         request.destroy();
       }

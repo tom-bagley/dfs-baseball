@@ -4,6 +4,7 @@ import { dirname, resolve } from 'node:path';
 const BASE_URL = 'https://www.fangraphs.com';
 const SIM_BASE_URL = `${BASE_URL}/api-baseball-sim/Simulation`;
 const DEFAULT_PROJECTION_SYSTEM = 'rSteamer';
+const DISPLAY_TIME_ZONE = 'America/Chicago';
 
 const args = parseArgs(process.argv.slice(2));
 const date = args.date || localDateString();
@@ -186,7 +187,15 @@ function formatLocalTime(value) {
   if (!value) return '';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '';
-  return date.toLocaleString();
+  return date.toLocaleString('en-US', {
+    timeZone: DISPLAY_TIME_ZONE,
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZoneName: 'short',
+  });
 }
 
 async function writeCsv(path, rows) {

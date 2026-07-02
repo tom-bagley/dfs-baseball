@@ -12,6 +12,7 @@ const ESPN_SCOREBOARD_URL = 'https://site.api.espn.com/apis/site/v2/sports/baseb
 const ESPN_CORE_BASE_URL = 'https://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb';
 const DEFAULT_PROJECTION_SYSTEM = 'rSteamer';
 const DEFAULT_LINE_TYPE = 'current';
+const DISPLAY_TIME_ZONE = 'America/Chicago';
 
 const TEAM_ALIASES = new Map([
   ['AZ', 'ARI'],
@@ -103,6 +104,113 @@ export async function getProjectionSlate({
     games: gameRows,
     cache: cacheStats,
     refreshedAt: new Date().toISOString(),
+  };
+}
+
+export async function getPlayerProjectionSlate({
+  date,
+  projectionSystem = DEFAULT_PROJECTION_SYSTEM,
+} = {}) {
+  validateDate(date);
+
+  const cacheStats = {
+    schedule: 'network',
+    simsHit: 0,
+    simsMiss: 0,
+  };
+
+  const games = await fetchFangraphsGames(date);
+  const rows = [];
+
+  for (const game of games) {
+    const schedule = game.schedule || {};
+    const scores = game.scores || {};
+    const simId = getSimId(schedule, date);
+
+    if (!simId) continue;
+
+    try {
+      const cached = await getCachedJson(simCachePath(projectionSystem, simId));
+      let sim = cached;
+      if (sim) {
+        cacheStats.simsHit += 1;
+      } else {
+        sim = await fetchGameSimulation(simId, projectionSystem);
+        await writeCachedJson(simCachePath(projectionSystem, simId), sim);
+        cacheStats.simsMiss += 1;
+      }
+
+      rows.push(...buildGamePlayerRows({ date, game, schedule, scores, simId, sim, projectionSystem }));
+    } catch (error) {
+      rows.push({
+        date,
+        gameId: schedule.GameId ?? game.GameId ?? '',
+        mlbGameId: schedule.MLBGameId ?? game.MLBGameId ?? '',
+        simId,
+        projectionSystem,
+        gameTimeUtc: schedule.GameDateTimeUTC || '',
+        gameTimeLocal: formatLocalTime(schedule.GameDateTimeUTC),
+        displayTime: formatDisplayTime(schedule.GameDateTimeUTC),
+        playerType: 'error',
+        playerId: '',
+        playerName: '',
+        team: schedule.AwayTeamAbbName && schedule.HomeTeamAbbName
+          ? `${schedule.AwayTeamAbbName} @ ${schedule.HomeTeamAbbName}`
+          : '',
+        expectedPoints: null,
+        error: formatError(error),
+      });
+    }
+  }
+
+  const draftKings = await loadDraftKingsSalaries(date);
+  if (draftKings?.rows?.length) {
+    const salaryStats = mergeDraftKingsSalaries(rows, draftKings.rows);
+    cacheStats.draftKingsSalaries = 'hit';
+    cacheStats.draftKingsRows = draftKings.rows.length;
+    cacheStats.draftKingsMatched = salaryStats.matched;
+  } else {
+    cacheStats.draftKingsSalaries = 'missing';
+    cacheStats.draftKingsRows = 0;
+    cacheStats.draftKingsMatched = 0;
+  }
+
+  rows.sort((a, b) => Number(b.expectedPoints ?? -9999) - Number(a.expectedPoints ?? -9999));
+
+  return {
+    ok: true,
+    date,
+    projectionSystem,
+    rows,
+    cache: cacheStats,
+    refreshedAt: new Date().toISOString(),
+  };
+}
+
+export async function importDraftKingsSalaries({
+  date,
+  csvText,
+} = {}) {
+  validateDate(date);
+  const rows = parseDraftKingsSalaryCsv(csvText);
+  if (!rows.length) {
+    throw new Error('No DraftKings salary rows were found in that CSV.');
+  }
+
+  const payload = {
+    date,
+    source: 'DraftKings',
+    rows,
+    importedAt: new Date().toISOString(),
+  };
+  await writeCachedJson(draftKingsSalaryCachePath(date), payload);
+
+  return {
+    ok: true,
+    date,
+    source: 'DraftKings',
+    rows: rows.length,
+    importedAt: payload.importedAt,
   };
 }
 
@@ -446,6 +554,411 @@ function playersFromSim(sim = {}) {
   };
 }
 
+function buildGamePlayerRows({ date, game, schedule, scores, simId, sim, projectionSystem }) {
+  const context = {
+    date,
+    gameId: schedule.GameId ?? game.GameId ?? '',
+    mlbGameId: schedule.MLBGameId ?? game.MLBGameId ?? '',
+    simId,
+    gameKey: schedule.MLBGameId ?? game.MLBGameId ?? schedule.GameId ?? game.GameId ?? '',
+    projectionSystem: sim?.projectionSystem || projectionSystem,
+    gameTimeUtc: schedule.GameDateTimeUTC || '',
+    gameTimeLocal: formatLocalTime(schedule.GameDateTimeUTC),
+    displayTime: formatDisplayTime(schedule.GameDateTimeUTC),
+    status: scores.isFinal ? 'Final' : scores.Inning ? `${scores.IH || ''} ${scores.Inning}`.trim() : '',
+    simulations: numberOrNull(sim?.simulations),
+    simLoadDate: sim?.loadDate || '',
+  };
+
+  const sides = [
+    {
+      side: 'away',
+      team: sim?.away,
+      teamInfo: sim?.awayTeam,
+      teamAbbrev: schedule.AwayTeamAbbName || '',
+      opponent: sim?.home,
+      opponentInfo: sim?.homeTeam,
+      opponentAbbrev: schedule.HomeTeamAbbName || '',
+    },
+    {
+      side: 'home',
+      team: sim?.home,
+      teamInfo: sim?.homeTeam,
+      teamAbbrev: schedule.HomeTeamAbbName || '',
+      opponent: sim?.away,
+      opponentInfo: sim?.awayTeam,
+      opponentAbbrev: schedule.AwayTeamAbbName || '',
+    },
+  ];
+
+  const rows = [];
+  for (const side of sides) {
+    const teamName = side.teamInfo?.name || side.team?.name || side.teamAbbrev;
+    const opponentName = side.opponentInfo?.name || side.opponent?.name || side.opponentAbbrev;
+    const teamId = side.teamInfo?.id ?? side.team?.id ?? '';
+    const opponentId = side.opponentInfo?.id ?? side.opponent?.id ?? '';
+    const lineupSource = side.team?.lineupSource || '';
+    const isConfirmedLineup = String(lineupSource).toLowerCase() === 'confirmed';
+
+    (side.team?.batters || []).forEach((player, index) => {
+      rows.push({
+        ...context,
+        playerType: 'hitter',
+        side: side.side,
+        teamId,
+        team: teamName,
+        teamAbbrev: side.teamAbbrev,
+        opponentId,
+        opponent: opponentName,
+        opponentAbbrev: side.opponentAbbrev,
+        lineupSlot: index + 1,
+        lineupSource,
+        confirmedLineup: isConfirmedLineup,
+        playerId: player.playerId || '',
+        playerName: player.name || '',
+        position: player.position || '',
+        role: '',
+        ...blankPitchingStats(),
+        ...hitterStats(player.average),
+        error: '',
+      });
+    });
+
+    (side.team?.pitchers || []).forEach((player) => {
+      rows.push({
+        ...context,
+        playerType: 'pitcher',
+        side: side.side,
+        teamId,
+        team: teamName,
+        teamAbbrev: side.teamAbbrev,
+        opponentId,
+        opponent: opponentName,
+        opponentAbbrev: side.opponentAbbrev,
+        lineupSlot: '',
+        lineupSource,
+        confirmedLineup: false,
+        playerId: player.playerId || '',
+        playerName: player.name || '',
+        position: '',
+        role: player.role || '',
+        ...blankHittingStats(),
+        ...pitcherStats(player.average, player.histograms),
+        error: '',
+      });
+    });
+  }
+
+  return rows;
+}
+
+function hitterStats(average = {}) {
+  const singles = stat(average, '1B');
+  const doubles = stat(average, '2B');
+  const triples = stat(average, '3B');
+  const homeRuns = stat(average, 'HR');
+  const runsBattedIn = stat(average, 'RBI');
+  const runs = stat(average, 'R');
+  const walks = stat(average, 'BB');
+  const hitByPitch = stat(average, 'HBP');
+  const stolenBases = stat(average, 'SB');
+
+  const hitterPoints =
+    singles * 3 +
+    doubles * 5 +
+    triples * 8 +
+    homeRuns * 10 +
+    runsBattedIn * 2 +
+    runs * 2 +
+    walks * 2 +
+    hitByPitch * 2 +
+    stolenBases * 5;
+
+  return {
+    singles,
+    doubles,
+    triples,
+    homeRuns,
+    runsBattedIn,
+    runs,
+    walks,
+    hitByPitch,
+    stolenBases,
+    hitterPoints: roundStat(hitterPoints),
+    pitcherPoints: null,
+    expectedPoints: roundStat(hitterPoints),
+  };
+}
+
+function pitcherStats(average = {}, histograms = {}) {
+  const outs = stat(average, 'Outs');
+  const inningsPitched = roundStat(outs / 3);
+  const strikeouts = stat(average, 'K');
+  const win = stat(average, 'W');
+  const earnedRunsAllowed = stat(average, 'ER');
+  const hitsAgainst = stat(average, 'H');
+  const walksAgainst = stat(average, 'BB');
+  const hitBatsmen = stat(average, 'HBP');
+  const completeGamePct = histogramProbability(histograms.Outs, (bucket) => bucket >= 27);
+  const runShutoutPct = histogramProbability(histograms.R, (bucket) => bucket === 0);
+  const noHitsAllowedPct = histogramProbability(histograms.H, (bucket) => bucket === 0);
+
+  const cgShutoutPctEstimate = Math.min(completeGamePct, runShutoutPct);
+  const noHitterPctEstimate = Math.min(completeGamePct, noHitsAllowedPct);
+
+  const pitcherPoints =
+    outs * 0.75 +
+    strikeouts * 2 +
+    win * 4 -
+    earnedRunsAllowed * 2 -
+    hitsAgainst * 0.6 -
+    walksAgainst * 0.6 -
+    hitBatsmen * 0.6 +
+    completeGamePct * 2.5 +
+    cgShutoutPctEstimate * 2.5 +
+    noHitterPctEstimate * 5;
+
+  return {
+    inningsPitched,
+    outs,
+    strikeouts,
+    win,
+    earnedRunsAllowed,
+    hitsAgainst,
+    walksAgainst,
+    hitBatsmen,
+    completeGamePct: roundStat(completeGamePct),
+    cgShutoutPctEstimate: roundStat(cgShutoutPctEstimate),
+    noHitterPctEstimate: roundStat(noHitterPctEstimate),
+    pitcherPoints: roundStat(pitcherPoints),
+    expectedPoints: roundStat(pitcherPoints),
+  };
+}
+
+function blankHittingStats() {
+  return {
+    singles: null,
+    doubles: null,
+    triples: null,
+    homeRuns: null,
+    runsBattedIn: null,
+    runs: null,
+    walks: null,
+    hitByPitch: null,
+    stolenBases: null,
+    hitterPoints: null,
+  };
+}
+
+function blankPitchingStats() {
+  return {
+    inningsPitched: null,
+    outs: null,
+    strikeouts: null,
+    win: null,
+    earnedRunsAllowed: null,
+    hitsAgainst: null,
+    walksAgainst: null,
+    hitBatsmen: null,
+    completeGamePct: null,
+    cgShutoutPctEstimate: null,
+    noHitterPctEstimate: null,
+  };
+}
+
+async function loadDraftKingsSalaries(date) {
+  return getCachedJson(draftKingsSalaryCachePath(date));
+}
+
+function mergeDraftKingsSalaries(rows, salaries) {
+  const salaryIndex = indexDraftKingsSalaries(salaries);
+  let matched = 0;
+
+  for (const row of rows) {
+    if (!row.playerName || !row.teamAbbrev) continue;
+    const salary = salaryIndex.get(draftKingsMatchKey(row.playerName, row.teamAbbrev));
+    if (!salary) continue;
+
+    row.dkSalary = salary.salary;
+    row.dkPosition = salary.position;
+    row.dkRosterPosition = salary.rosterPosition;
+    row.dkGameInfo = salary.gameInfo;
+    row.dkName = salary.name;
+    row.dkId = salary.id;
+    row.dkAvgPointsPerGame = salary.avgPointsPerGame;
+    row.dkValue = typeof row.expectedPoints === 'number' && typeof salary.salary === 'number' && salary.salary > 0
+      ? roundStat(row.expectedPoints / (salary.salary / 1000))
+      : null;
+    row.dkDollarsPerPoint = typeof row.expectedPoints === 'number'
+      && row.expectedPoints > 0
+      && typeof salary.salary === 'number'
+      ? roundStat(salary.salary / row.expectedPoints, 2)
+      : null;
+    matched += 1;
+  }
+
+  return { matched };
+}
+
+function indexDraftKingsSalaries(salaries) {
+  const index = new Map();
+  for (const salary of salaries) {
+    const key = draftKingsMatchKey(salary.name, salary.teamAbbrev);
+    if (key && !index.has(key)) index.set(key, salary);
+  }
+  return index;
+}
+
+function parseDraftKingsSalaryCsv(csvText) {
+  const table = parseCsv(csvText);
+  if (table.length < 2) return [];
+
+  const headers = table[0].map(normalizeHeader);
+  return table.slice(1)
+    .map((cells) => {
+      const row = rowFromCsvCells(headers, cells);
+      const name = cleanDraftKingsName(csvCell(row, ['name', 'nameandid']));
+      const teamAbbrev = normalizeTeam(csvCell(row, ['teamabbrev', 'team', 'teamabbr']));
+      const salary = parseSalary(csvCell(row, ['salary']));
+
+      return {
+        name,
+        normalizedName: normalizePlayerName(name),
+        id: csvCell(row, ['id', 'playerid']),
+        rosterPosition: csvCell(row, ['rosterposition']),
+        position: csvCell(row, ['position']),
+        salary,
+        gameInfo: csvCell(row, ['gameinfo', 'game']),
+        teamAbbrev,
+        avgPointsPerGame: parseNullableNumber(csvCell(row, ['avgpointspergame', 'fppg'])),
+      };
+    })
+    .filter((row) => row.name && row.teamAbbrev && typeof row.salary === 'number');
+}
+
+function parseCsv(text = '') {
+  const rows = [];
+  let row = [];
+  let cell = '';
+  let inQuotes = false;
+
+  for (let index = 0; index < String(text).length; index += 1) {
+    const char = text[index];
+    const next = text[index + 1];
+
+    if (char === '"') {
+      if (inQuotes && next === '"') {
+        cell += '"';
+        index += 1;
+      } else {
+        inQuotes = !inQuotes;
+      }
+      continue;
+    }
+
+    if (char === ',' && !inQuotes) {
+      row.push(cell);
+      cell = '';
+      continue;
+    }
+
+    if ((char === '\n' || char === '\r') && !inQuotes) {
+      if (char === '\r' && next === '\n') index += 1;
+      row.push(cell);
+      rows.push(row);
+      row = [];
+      cell = '';
+      continue;
+    }
+
+    cell += char;
+  }
+
+  if (cell || row.length) {
+    row.push(cell);
+    rows.push(row);
+  }
+
+  return rows.filter((cells) => cells.some((value) => String(value).trim()));
+}
+
+function rowFromCsvCells(headers, cells) {
+  const row = {};
+  headers.forEach((header, index) => {
+    row[header] = String(cells[index] ?? '').trim();
+  });
+  return row;
+}
+
+function csvCell(row, names) {
+  for (const name of names) {
+    const key = normalizeHeader(name);
+    if (row[key]) return row[key];
+  }
+  return '';
+}
+
+function normalizeHeader(value) {
+  return String(value || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+function cleanDraftKingsName(value) {
+  return String(value || '').replace(/\s+\(\d+\)\s*$/, '').trim();
+}
+
+function draftKingsMatchKey(name, teamAbbrev) {
+  const normalizedName = normalizePlayerName(name);
+  const normalizedTeam = normalizeTeam(teamAbbrev);
+  return normalizedName && normalizedTeam ? `${normalizedName}|${normalizedTeam}` : '';
+}
+
+function normalizePlayerName(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\b(jr|sr|ii|iii|iv|v)\b\.?/gi, '')
+    .replace(/[^a-z0-9]/gi, '')
+    .toLowerCase();
+}
+
+function parseSalary(value) {
+  const number = Number(String(value || '').replace(/[$,]/g, '').trim());
+  return Number.isFinite(number) && number > 0 ? number : null;
+}
+
+function parseNullableNumber(value) {
+  if (value == null || value === '') return null;
+  const number = Number(String(value).replace(/[$,]/g, '').trim());
+  return Number.isFinite(number) ? number : null;
+}
+
+function stat(average, key) {
+  return roundStat(average?.[key] ?? 0);
+}
+
+function histogramProbability(histogram, predicate) {
+  const buckets = histogram?.buckets;
+  const total = Number(histogram?.total);
+  if (!buckets || !Number.isFinite(total) || total <= 0) return 0;
+
+  let matching = 0;
+  for (const [bucket, count] of Object.entries(buckets)) {
+    const value = Number(bucket);
+    const bucketCount = Number(count);
+    if (Number.isFinite(value) && Number.isFinite(bucketCount) && predicate(value)) {
+      matching += bucketCount;
+    }
+  }
+
+  return matching / total;
+}
+
+function roundStat(value, places = 6) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return 0;
+  return Number(number.toFixed(places));
+}
+
 function sidePlayers(side = {}, type, teamInfo = {}, opponentInfo = {}) {
   const list = type === 'pitcher' ? side?.pitchers : side?.batters;
   if (!Array.isArray(list)) return [];
@@ -684,6 +1197,10 @@ function customSimCachePath(projectionSystem, hash) {
   return join(CACHE_ROOT, 'fangraphs-custom-sims', safeSegment(projectionSystem), `${safeSegment(hash)}.json`);
 }
 
+function draftKingsSalaryCachePath(date) {
+  return join(CACHE_ROOT, 'draftkings-salaries', `${safeSegment(date)}.json`);
+}
+
 function hashJson(value) {
   return createHash('sha256').update(JSON.stringify(value)).digest('hex');
 }
@@ -752,14 +1269,26 @@ function formatLocalTime(value) {
   if (!value) return '';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '';
-  return date.toLocaleString();
+  return date.toLocaleString('en-US', {
+    timeZone: DISPLAY_TIME_ZONE,
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZoneName: 'short',
+  });
 }
 
 function formatDisplayTime(value) {
   if (!value) return '';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  return date.toLocaleTimeString('en-US', {
+    timeZone: DISPLAY_TIME_ZONE,
+    hour: 'numeric',
+    minute: '2-digit',
+  }) + ' CT';
 }
 
 function validateDate(date) {

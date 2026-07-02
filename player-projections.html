@@ -854,9 +854,9 @@
         .filter((row) => {
           if (row.playerType !== type) return false;
           if (hasGameOptions && !selectedGameKeys.has(rowGameKey(row))) return false;
-          if (positionOrRole && rowPositionOrRole(row) !== positionOrRole) return false;
+          if (positionOrRole && !rowPositionOrRoleValues(row).includes(positionOrRole)) return false;
           if (!query) return true;
-          return `${row.playerName} ${row.team} ${row.teamAbbrev} ${row.opponent} ${row.opponentAbbrev} ${row.position} ${row.role}`.toLowerCase().includes(query);
+          return `${row.playerName} ${row.team} ${row.teamAbbrev} ${row.opponent} ${row.opponentAbbrev} ${row.position} ${row.role} ${row.dkPosition} ${row.dkRosterPosition}`.toLowerCase().includes(query);
         })
         .sort(compareRows);
 
@@ -1075,8 +1075,8 @@
       const type = typeFilter.value;
       const values = [...new Set(state.rows
         .filter((row) => row.playerType === type)
-        .map(rowPositionOrRole)
-        .filter(Boolean))]
+        .flatMap(rowPositionOrRoleValues)
+        .filter((value) => shouldShowPositionRoleOption(type, value)))]
         .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
 
       const allLabel = type === "pitcher" ? "All roles" : "All positions";
@@ -1115,8 +1115,22 @@
       return String(row.gameKey || row.mlbGameId || row.gameId || "");
     }
 
-    function rowPositionOrRole(row) {
-      return String(row.playerType === "pitcher" ? row.role || "" : row.position || "");
+    function rowPositionOrRoleValues(row) {
+      if (row.playerType === "pitcher") return [String(row.role || "")].filter(Boolean);
+      return splitPositionEligibility(row.dkPosition || row.dkRosterPosition || row.position);
+    }
+
+    function shouldShowPositionRoleOption(type, value) {
+      if (!value) return false;
+      if (type !== "hitter") return true;
+      return !["CF", "DH", "LF", "RF"].includes(String(value).trim().toUpperCase());
+    }
+
+    function splitPositionEligibility(value) {
+      return String(value || "")
+        .split(/[\/,;]/)
+        .map((position) => position.trim())
+        .filter(Boolean);
     }
 
     function gameLabel(row) {

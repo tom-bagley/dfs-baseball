@@ -1,0 +1,16 @@
+{
+  "name": "fangraphs-baseball-sim-csv",
+  "version": "1.0.0",
+  "description": "Export FanGraphs Lab Baseball Sim games to CSV.",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "node src/team-projections-server.js",
+    "viewer": "node src/team-projections-server.js",
+    "export": "node src/export-fangraphs-sim.js",
+    "export:players": "node src/export-fangraphs-players.js",
+    "backtest:moneylines": "node src/backtest-fangraphs-moneylines.js"
+  },
+  "dependencies": {},
+  "devDependencies": {}
+}

@@ -79,6 +79,23 @@ Options:
 - `--request-delay-ms NUMBER`: delay before each HTTP request. Defaults to `250`.
 - `--retries NUMBER`: retry count for 429/5xx responses. Defaults to `4`.
 
+## Projection Calibration Backtest
+
+```powershell
+node src/backtest-projection-calibration.js --start 2026-05-04 --end 2026-07-05
+```
+
+Compares FanGraphs sim projection systems (`rSteamer`, `rSteamerPN`, `Steamer`, `ZiPS` by default) on how accurate their fair moneylines are. For every final game it bets the sim favorite at that system's fair moneyline, then compares the predicted win percentage (average favorite probability) against the actual win percentage from historical results, along with fair-odds profit and Brier score. Stored sims begin on 2026-05-04. Per-date responses are cached under `out/cache/projection-calibration/` so reruns only fetch new dates.
+
+Options:
+
+- `--start YYYY-MM-DD`: first game date. Defaults to `2026-05-04`.
+- `--end YYYY-MM-DD`: last game date. Defaults to yesterday.
+- `--systems A,B,C`: projection systems to compare.
+- `--output-prefix PATH`: output prefix for the games CSV and summary JSON.
+- `--cache-dir PATH`: per-date cache directory.
+- `--concurrency`, `--request-delay-ms`, `--retries`: request pacing, same defaults as the moneyline backtest.
+
 ## Player Expected Points
 
 ```powershell

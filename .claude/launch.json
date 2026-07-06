@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "projections-server",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["src/team-projections-server.js"],
+      "port": 8000
+    }
+  ]
+}

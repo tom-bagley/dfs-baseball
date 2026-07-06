@@ -9,7 +9,8 @@
     "viewer": "node src/team-projections-server.js",
     "export": "node src/export-fangraphs-sim.js",
     "export:players": "node src/export-fangraphs-players.js",
-    "backtest:moneylines": "node src/backtest-fangraphs-moneylines.js"
+    "backtest:moneylines": "node src/backtest-fangraphs-moneylines.js",
+    "backtest:calibration": "node src/backtest-projection-calibration.js"
   },
   "dependencies": {},
   "devDependencies": {}

@@ -107,6 +107,7 @@
     }
 
     input,
+    select,
     button {
       min-height: 40px;
       border-radius: 6px;
@@ -115,6 +116,7 @@
 
     input[type="date"],
     input[type="search"],
+    select,
     .custom-input {
       border: 1px solid var(--line);
       background: var(--panel);
@@ -561,6 +563,15 @@
           Date
           <input id="dateInput" type="date">
         </label>
+        <label title="FanGraphs projection system used to run the simulations">
+          Projection
+          <select id="projectionSystemSelect">
+            <option value="rSteamer" selected>rSteamer</option>
+            <option value="rSteamerPN">rSteamerPN</option>
+            <option value="Steamer">Steamer</option>
+            <option value="ZiPS">ZiPS</option>
+          </select>
+        </label>
         <button id="refreshButton" class="primary" type="button" title="Refresh projections for the selected date">
           Refresh
         </button>
@@ -650,6 +661,7 @@
     };
 
     const dateInput = document.querySelector("#dateInput");
+    const projectionSystemSelect = document.querySelector("#projectionSystemSelect");
     const refreshButton = document.querySelector("#refreshButton");
     const searchInput = document.querySelector("#searchInput");
     const statusEl = document.querySelector("#status");
@@ -721,7 +733,7 @@
       const response = await fetch("/api/refresh-projections", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ date, lineType: "current" }),
+        body: JSON.stringify({ date, lineType: "current", projectionSystem: projectionSystemSelect.value }),
       });
       const result = await response.json().catch(() => ({}));
       if (!response.ok) {

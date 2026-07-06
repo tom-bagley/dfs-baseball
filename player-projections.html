@@ -124,6 +124,7 @@
     }
 
     input[type="date"],
+    input[type="number"],
     input[type="search"],
     select {
       border: 1px solid var(--line);
@@ -339,6 +340,39 @@
       width: 150px;
     }
 
+    .budget-input {
+      width: 110px;
+    }
+
+    .stack-input {
+      width: 60px;
+    }
+
+    .build-players {
+      min-width: 420px;
+      line-height: 1.7;
+    }
+
+    .build-players .slot-tag {
+      color: var(--muted, #6a7686);
+      font-size: 0.78rem;
+      font-weight: 800;
+      margin-right: 2px;
+    }
+
+    .build-players .build-player {
+      white-space: nowrap;
+      margin-right: 10px;
+    }
+
+    .optimizer {
+      margin-bottom: 14px;
+    }
+
+    .optimizer table {
+      min-width: 0;
+    }
+
     .table-wrap {
       overflow: auto;
       max-height: calc(100vh - 285px);
@@ -546,8 +580,39 @@
         <button id="refreshButton" class="primary" type="button" title="Refresh player projections for the selected date">
           Refresh
         </button>
+        <label>
+          Budget
+          <input id="budgetInput" class="budget-input" type="number" min="100" step="100" value="50000">
+        </label>
+        <label title="Minimum hitters from a single team, to build stacks (0 or 1 = no stacking)">
+          Stack
+          <input id="stackInput" class="stack-input" type="number" min="0" max="8" step="1" value="4">
+        </label>
+        <button id="maxPointsButton" type="button" class="file-button" title="Build the highest-scoring lineup (2 SP, 1 C, 1 1B, 1 2B, 1 3B, 1 SS, 3 OF) that fits the budget and stack requirement">
+          Max Points
+        </button>
       </div>
     </header>
+
+    <section id="optimizerShell" class="table-shell optimizer" hidden aria-label="Max points result">
+      <div class="table-top">
+        <div id="optimizerSummary" class="status"></div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th class="num">#</th>
+              <th class="num">Expected</th>
+              <th class="num">Cost</th>
+              <th>Stack</th>
+              <th>Players</th>
+            </tr>
+          </thead>
+          <tbody id="optimizerBody"></tbody>
+        </table>
+      </div>
+    </section>
 
     <section class="toolbar" aria-label="Slate summary">
       <div class="metric">
@@ -654,6 +719,12 @@
     const gamesAllButton = document.querySelector("#gamesAllButton");
     const gamesNoneButton = document.querySelector("#gamesNoneButton");
     const positionRoleFilter = document.querySelector("#positionRoleFilter");
+    const budgetInput = document.querySelector("#budgetInput");
+    const stackInput = document.querySelector("#stackInput");
+    const maxPointsButton = document.querySelector("#maxPointsButton");
+    const optimizerShell = document.querySelector("#optimizerShell");
+    const optimizerSummary = document.querySelector("#optimizerSummary");
+    const optimizerBody = document.querySelector("#optimizerBody");
     const statusEl = document.querySelector("#status");
     const playerTable = document.querySelector("#playerTable");
     const tableBody = document.querySelector("#tableBody");
@@ -667,6 +738,10 @@
 
     refreshButton.addEventListener("click", () => {
       refreshPlayers(dateInput.value);
+    });
+
+    maxPointsButton.addEventListener("click", () => {
+      calculateMaxPoints();
     });
 
     dkFileInput.addEventListener("change", () => {
@@ -841,6 +916,313 @@
       const gameCount = new Set(playerRows.map((row) => row.gameKey || row.mlbGameId || row.gameId).filter(Boolean)).size;
       const errorCount = playerRows.filter((row) => row.error).length;
       setStatus(`Loaded ${playerRows.length} players from ${gameCount} games${errorCount ? `; ${errorCount} rows have notes` : ""}. ${cacheSummary(result.cache)}`);
+    }
+
+    // Roster: 2 SP plus 1 C, 1 1B, 1 2B, 1 3B, 1 SS, 3 OF.
+    const HITTER_SLOTS = ["C", "1B", "2B", "3B", "SS", "OF"];
+    const HITTER_SLOT_NEEDS = [1, 1, 1, 1, 1, 3];
+    const OUTFIELD_ALIASES = new Set(["OF", "LF", "CF", "RF"]);
+    const MAX_BUILDS = 10;
+
+    function calculateMaxPoints() {
+      const budget = Math.floor(Number(budgetInput.value));
+      if (!Number.isFinite(budget) || budget <= 0) {
+        setStatus("Enter a positive budget before calculating max points.", true);
+        return;
+      }
+
+      const stackSize = Math.floor(Number(stackInput.value));
+      if (!Number.isFinite(stackSize) || stackSize < 0 || stackSize > 8) {
+        setStatus("Stack size must be between 0 and 8 (a lineup has 8 hitters).", true);
+        return;
+      }
+
+      const seen = new Set();
+      const players = state.rows.filter((row) => {
+        if (typeof row.dkSalary !== "number" || row.dkSalary <= 0) return false;
+        if (typeof row.expectedPoints !== "number" || !Number.isFinite(row.expectedPoints)) return false;
+        const key = row.dkId || `${row.playerName}|${row.teamAbbrev}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+
+      if (!players.length) {
+        optimizerShell.hidden = true;
+        setStatus(
+          state.rows.length
+            ? "No players have DK salaries yet. Import a DK CSV, then refresh."
+            : "Refresh projections and import a DK CSV before calculating max points.",
+          true,
+        );
+        return;
+      }
+
+      const starters = [];
+      const hitters = [];
+      for (const row of players) {
+        if (row.playerType === "pitcher") {
+          if (isStartingPitcher(row)) starters.push(row);
+          continue;
+        }
+        const slots = hitterSlotIndexes(row);
+        if (slots.length) hitters.push({ row, slots });
+      }
+
+      const shortfalls = [];
+      if (starters.length < 2) shortfalls.push(`SP (${starters.length}/2)`);
+      HITTER_SLOTS.forEach((slot, index) => {
+        const eligible = hitters.filter((hitter) => hitter.slots.includes(index)).length;
+        if (eligible < HITTER_SLOT_NEEDS[index]) shortfalls.push(`${slot} (${eligible}/${HITTER_SLOT_NEEDS[index]})`);
+      });
+      if (shortfalls.length) {
+        optimizerShell.hidden = true;
+        setStatus(`Not enough eligible players to fill the lineup: ${shortfalls.join(", ")}.`, true);
+        return;
+      }
+
+      if (stackSize > 1) {
+        const teamCounts = new Map();
+        for (const hitter of hitters) {
+          const team = hitter.row.teamAbbrev || "";
+          if (team) teamCounts.set(team, (teamCounts.get(team) || 0) + 1);
+        }
+        const deepestTeam = Math.max(0, ...teamCounts.values());
+        if (deepestTeam < stackSize) {
+          optimizerShell.hidden = true;
+          setStatus(`No team has ${stackSize} eligible hitters for the stack (deepest team has ${deepestTeam}). Lower the stack size.`, true);
+          return;
+        }
+      }
+
+      const builds = solveLineups(starters, hitters, budget, stackSize, MAX_BUILDS);
+
+      if (!builds.length) {
+        optimizerShell.hidden = true;
+        const stackNote = stackSize > 1 ? ` with a ${stackSize}-hitter team stack` : "";
+        setStatus(`No valid lineup (2 SP, 1 C, 1 1B, 1 2B, 1 3B, 1 SS, 3 OF)${stackNote} fits within ${formatSalary(budget)}. Try raising the budget or lowering the stack size.`, true);
+        return;
+      }
+
+      const stackNote = stackSize > 1 ? ` with a ${stackSize}-hitter team stack` : "";
+      optimizerSummary.textContent = `Top ${builds.length} builds within ${formatSalary(budget)}${stackNote}: best ${builds[0].points.toFixed(2)} pts (2 SP, 1 C, 1 1B, 1 2B, 1 3B, 1 SS, 3 OF from ${starters.length + hitters.length} eligible players).`;
+      optimizerBody.innerHTML = builds.map((build, index) => {
+        const stackCounts = new Map();
+        for (const pick of build.lineup) {
+          if (pick.slot === "P") continue;
+          const team = pick.row.teamAbbrev || "";
+          if (team) stackCounts.set(team, (stackCounts.get(team) || 0) + 1);
+        }
+        const [stackTeam, stackCount] = [...stackCounts.entries()].sort((a, b) => b[1] - a[1])[0] || ["", 0];
+        const players = build.lineup.map((pick) => `
+          <span class="build-player"><span class="slot-tag">${escapeHtml(pick.slot)}</span>${escapeHtml(pick.row.playerName || "--")}</span>
+        `).join("");
+        return `
+          <tr>
+            <td class="num">${index + 1}</td>
+            <td class="num">${build.points.toFixed(2)}</td>
+            <td class="num">${formatSalary(build.salary)}</td>
+            <td>${stackCount > 1 ? `${stackCount}x <span class="abbrev">${escapeHtml(stackTeam)}</span>` : "--"}</td>
+            <td class="build-players">${players}</td>
+          </tr>
+        `;
+      }).join("");
+      optimizerShell.hidden = false;
+      setStatus(`Found ${builds.length} builds within ${formatSalary(budget)}; best is ${builds[0].points.toFixed(2)} expected points.`);
+    }
+
+    // DK-listed SPs plus anyone the sim projects as that day's starter, so
+    // starters DK still labels RP (openers, converted relievers) are included.
+    function isStartingPitcher(row) {
+      if (String(row.role || "").trim().toLowerCase() === "starter") return true;
+      return splitPositionEligibility(row.dkPosition || row.dkRosterPosition).includes("SP");
+    }
+
+    function hitterSlotIndexes(row) {
+      const slots = new Set();
+      for (const raw of splitPositionEligibility(row.dkPosition || row.dkRosterPosition || row.position)) {
+        const position = raw.toUpperCase();
+        const index = OUTFIELD_ALIASES.has(position) ? 5 : HITTER_SLOTS.indexOf(position);
+        if (index >= 0) slots.add(index);
+      }
+      return [...slots];
+    }
+
+    // Exact optimum via dynamic programming: fill the six hitter slots with a
+    // knapsack over salary (in $100 units) x slot-fill state, then try every SP
+    // pair against the best full-hitter set that fits the remaining budget.
+    // Slot state = ofCount * 32 + bitmask(C, 1B, 2B, 3B, SS); 128 states total.
+    // A stack of K > 1 adds a state layer counting hitters from one candidate
+    // team (saturating at K); the DP runs once per team deep enough to stack,
+    // accepting only states where the count reached K. Each (stack team, SP
+    // pair) combination yields its own optimal build; the top maxBuilds across
+    // all combinations are returned, best first.
+    function solveLineups(starters, hitters, budget, stackSize, maxBuilds) {
+      const unit = 100;
+      const cap = Math.floor(budget / unit);
+      if (cap < 1) return [];
+
+      const K = stackSize > 1 ? Math.min(stackSize, 8) : 0;
+      let teams = [null];
+      if (K) {
+        const teamCounts = new Map();
+        for (const hitter of hitters) {
+          const team = hitter.row.teamAbbrev || "";
+          if (team) teamCounts.set(team, (teamCounts.get(team) || 0) + 1);
+        }
+        teams = [...teamCounts.keys()].filter((team) => teamCounts.get(team) >= K);
+        if (!teams.length) return [];
+      }
+
+      const SLOT_STATES = 128;
+      const LAYERS = K + 1;
+      const STATES = SLOT_STATES * LAYERS;
+      const FULL = K * SLOT_STATES + 127;
+      if (hitters.length * (cap + 1) * STATES > 256 * 1024 * 1024) return []; // keep traceback memory sane
+
+      const transitions = HITTER_SLOTS.map((slot, k) => {
+        const list = [];
+        if (k === 5) {
+          for (let of = 1; of <= 3; of += 1) {
+            for (let bits = 0; bits < 32; bits += 1) list.push([of * 32 + bits, (of - 1) * 32 + bits]);
+          }
+        } else {
+          const bit = 1 << k;
+          for (let of = 0; of <= 3; of += 1) {
+            for (let bits = 0; bits < 32; bits += 1) {
+              if (bits & bit) list.push([of * 32 + bits, of * 32 + (bits ^ bit)]);
+            }
+          }
+        }
+        return list;
+      });
+
+      const weightOf = (row) => Math.max(1, Math.ceil(row.dkSalary / unit));
+      const best = new Float64Array((cap + 1) * STATES);
+      const choice = new Uint8Array(hitters.length * (cap + 1) * STATES);
+      const candidates = [];
+
+      for (const team of teams) {
+        best.fill(-Infinity);
+        best[0] = 0;
+        choice.fill(0);
+
+        hitters.forEach((hitter, i) => {
+          const weight = weightOf(hitter.row);
+          const points = hitter.row.expectedPoints;
+          const onTeam = team !== null && (hitter.row.teamAbbrev || "") === team;
+          const base = i * (cap + 1) * STATES;
+          for (let c = cap; c >= weight; c -= 1) {
+            const target = c * STATES;
+            const source = (c - weight) * STATES;
+            for (const k of hitter.slots) {
+              for (const [s, sPrev] of transitions[k]) {
+                for (let layer = 0; layer < LAYERS; layer += 1) {
+                  const targetIndex = target + layer * SLOT_STATES + s;
+                  if (!onTeam) {
+                    const candidate = best[source + layer * SLOT_STATES + sPrev] + points;
+                    if (candidate > best[targetIndex]) {
+                      best[targetIndex] = candidate;
+                      choice[base + targetIndex] = k + 1;
+                    }
+                    continue;
+                  }
+                  // Stack-team hitters raise the count layer by one; at the top
+                  // layer (already >= K) they may also stay, flagged with bit 3.
+                  if (layer > 0) {
+                    const candidate = best[source + (layer - 1) * SLOT_STATES + sPrev] + points;
+                    if (candidate > best[targetIndex]) {
+                      best[targetIndex] = candidate;
+                      choice[base + targetIndex] = k + 1;
+                    }
+                  }
+                  if (layer === K) {
+                    const candidate = best[source + layer * SLOT_STATES + sPrev] + points;
+                    if (candidate > best[targetIndex]) {
+                      best[targetIndex] = candidate;
+                      choice[base + targetIndex] = (k + 1) | 8;
+                    }
+                  }
+                }
+              }
+            }
+          }
+        });
+
+        // bestHitterAt[c] = cheapest salary index c' <= c with the highest full-lineup score.
+        const bestHitterAt = new Int32Array(cap + 1).fill(-1);
+        let runningBest = -Infinity;
+        let runningIndex = -1;
+        for (let c = 0; c <= cap; c += 1) {
+          const value = best[c * STATES + FULL];
+          if (value > runningBest) {
+            runningBest = value;
+            runningIndex = c;
+          }
+          bestHitterAt[c] = runningIndex;
+        }
+
+        // Every SP pair gets its own optimal build for this stack team; keep
+        // this team's best maxBuilds of them.
+        const pairs = [];
+        for (let i = 0; i < starters.length; i += 1) {
+          for (let j = i + 1; j < starters.length; j += 1) {
+            const pairWeight = weightOf(starters[i]) + weightOf(starters[j]);
+            if (pairWeight > cap) continue;
+            const hitterIndex = bestHitterAt[cap - pairWeight];
+            if (hitterIndex < 0) continue;
+            const total = starters[i].expectedPoints + starters[j].expectedPoints + best[hitterIndex * STATES + FULL];
+            pairs.push([total, i, j, hitterIndex]);
+          }
+        }
+        pairs.sort((a, b) => b[0] - a[0]);
+
+        // Reconstruct now, before the next team's pass reuses the DP buffers.
+        for (const [total, pairI, pairJ, hitterIndex] of pairs.slice(0, maxBuilds)) {
+          const lineup = [
+            { slot: "P", row: starters[pairI] },
+            { slot: "P", row: starters[pairJ] },
+          ];
+          let c = hitterIndex;
+          let s = FULL;
+          for (let i = hitters.length - 1; i >= 0; i -= 1) {
+            const picked = choice[i * (cap + 1) * STATES + c * STATES + s];
+            if (!picked) continue;
+            const k = (picked & 7) - 1;
+            lineup.push({ slot: HITTER_SLOTS[k], row: hitters[i].row });
+            const layer = Math.floor(s / SLOT_STATES);
+            let slotState = s % SLOT_STATES;
+            slotState = k === 5 ? slotState - 32 : slotState ^ (1 << k);
+            const onTeam = team !== null && (hitters[i].row.teamAbbrev || "") === team;
+            const sourceLayer = onTeam && !(picked & 8) ? layer - 1 : layer;
+            s = sourceLayer * SLOT_STATES + slotState;
+            c -= weightOf(hitters[i].row);
+          }
+          candidates.push({ points: total, lineup });
+        }
+      }
+
+      candidates.sort((a, b) => b.points - a.points);
+
+      const slotOrder = ["P", ...HITTER_SLOTS];
+      const seenBuilds = new Set();
+      const builds = [];
+      for (const candidate of candidates) {
+        if (builds.length >= maxBuilds) break;
+        const signature = candidate.lineup
+          .map((pick) => pick.row.dkId || `${pick.row.playerName}|${pick.row.teamAbbrev}`)
+          .sort()
+          .join("~");
+        if (seenBuilds.has(signature)) continue;
+        seenBuilds.add(signature);
+        candidate.lineup.sort((a, b) => slotOrder.indexOf(a.slot) - slotOrder.indexOf(b.slot) || b.row.expectedPoints - a.row.expectedPoints);
+        builds.push({
+          points: candidate.points,
+          salary: candidate.lineup.reduce((sum, pick) => sum + pick.row.dkSalary, 0),
+          lineup: candidate.lineup,
+        });
+      }
+      return builds;
     }
 
     function applyFilterAndSort() {

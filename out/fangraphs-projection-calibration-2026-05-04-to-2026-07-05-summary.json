@@ -1,0 +1,121 @@
+{
+  "start": "2026-05-04",
+  "end": "2026-07-05",
+  "systems": [
+    "rSteamer",
+    "rSteamerPN",
+    "Steamer",
+    "ZiPS"
+  ],
+  "totalGames": 834,
+  "finalGamesWithWinner": 834,
+  "gamesWhereAllSystemsHaveSims": 704,
+  "perSystemAllCoveredGames": {
+    "rSteamer": {
+      "games": 834,
+      "favoriteBets": 834,
+      "predictedWinPct": 0.557424,
+      "actualWinPct": 0.551559,
+      "calibrationGap": -0.005866,
+      "fairOddsProfitUnits": -7.095448,
+      "fairOddsRoi": -0.008508,
+      "avgHomeWinPct": 0.522514,
+      "actualHomeWinPct": 0.515588,
+      "brierScore": 0.246569,
+      "logLoss": 0.686142
+    },
+    "rSteamerPN": {
+      "games": 704,
+      "favoriteBets": 704,
+      "predictedWinPct": 0.554315,
+      "actualWinPct": 0.551136,
+      "calibrationGap": -0.003179,
+      "fairOddsProfitUnits": -2.957898,
+      "fairOddsRoi": -0.004202,
+      "avgHomeWinPct": 0.520508,
+      "actualHomeWinPct": 0.505682,
+      "brierScore": 0.246456,
+      "logLoss": 0.685864
+    },
+    "Steamer": {
+      "games": 834,
+      "favoriteBets": 833,
+      "predictedWinPct": 0.558673,
+      "actualWinPct": 0.510204,
+      "calibrationGap": -0.048469,
+      "fairOddsProfitUnits": -75.57972,
+      "fairOddsRoi": -0.090732,
+      "avgHomeWinPct": 0.52172,
+      "actualHomeWinPct": 0.515588,
+      "brierScore": 0.247994,
+      "logLoss": 0.688974
+    },
+    "ZiPS": {
+      "games": 834,
+      "favoriteBets": 834,
+      "predictedWinPct": 0.562335,
+      "actualWinPct": 0.528777,
+      "calibrationGap": -0.033558,
+      "fairOddsProfitUnits": -48.95224,
+      "fairOddsRoi": -0.058696,
+      "avgHomeWinPct": 0.521151,
+      "actualHomeWinPct": 0.515588,
+      "brierScore": 0.248725,
+      "logLoss": 0.690481
+    }
+  },
+  "perSystemSharedGamesOnly": {
+    "rSteamer": {
+      "games": 704,
+      "favoriteBets": 704,
+      "predictedWinPct": 0.55715,
+      "actualWinPct": 0.553977,
+      "calibrationGap": -0.003173,
+      "fairOddsProfitUnits": -2.240607,
+      "fairOddsRoi": -0.003183,
+      "avgHomeWinPct": 0.521905,
+      "actualHomeWinPct": 0.505682,
+      "brierScore": 0.246625,
+      "logLoss": 0.686201
+    },
+    "rSteamerPN": {
+      "games": 704,
+      "favoriteBets": 704,
+      "predictedWinPct": 0.554315,
+      "actualWinPct": 0.551136,
+      "calibrationGap": -0.003179,
+      "fairOddsProfitUnits": -2.957898,
+      "fairOddsRoi": -0.004202,
+      "avgHomeWinPct": 0.520508,
+      "actualHomeWinPct": 0.505682,
+      "brierScore": 0.246456,
+      "logLoss": 0.685864
+    },
+    "Steamer": {
+      "games": 704,
+      "favoriteBets": 703,
+      "predictedWinPct": 0.558235,
+      "actualWinPct": 0.509246,
+      "calibrationGap": -0.048989,
+      "fairOddsProfitUnits": -64.494529,
+      "fairOddsRoi": -0.091742,
+      "avgHomeWinPct": 0.521097,
+      "actualHomeWinPct": 0.505682,
+      "brierScore": 0.248106,
+      "logLoss": 0.689149
+    },
+    "ZiPS": {
+      "games": 704,
+      "favoriteBets": 704,
+      "predictedWinPct": 0.561381,
+      "actualWinPct": 0.52983,
+      "calibrationGap": -0.031552,
+      "fairOddsProfitUnits": -39.034128,
+      "fairOddsRoi": -0.055446,
+      "avgHomeWinPct": 0.520079,
+      "actualHomeWinPct": 0.505682,
+      "brierScore": 0.248339,
+      "logLoss": 0.689644
+    }
+  }
+}

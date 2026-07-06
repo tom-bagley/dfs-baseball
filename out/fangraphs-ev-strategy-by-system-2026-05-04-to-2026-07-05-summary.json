@@ -1,0 +1,162 @@
+{
+  "games": 834,
+  "sharedGames": 704,
+  "minEvs": {
+    "0": {
+      "allCoveredGames": {
+        "rSteamer": {
+          "games": 834,
+          "bets": 448,
+          "wins": 211,
+          "losses": 237,
+          "hitPct": 0.470982,
+          "profitUnits": -7.986603,
+          "roi": -0.017827
+        },
+        "rSteamerPN": {
+          "games": 704,
+          "bets": 404,
+          "wins": 185,
+          "losses": 219,
+          "hitPct": 0.457921,
+          "profitUnits": -16.338469,
+          "roi": -0.040442
+        },
+        "Steamer": {
+          "games": 834,
+          "bets": 513,
+          "wins": 245,
+          "losses": 268,
+          "hitPct": 0.477583,
+          "profitUnits": -8.508069,
+          "roi": -0.016585
+        },
+        "ZiPS": {
+          "games": 834,
+          "bets": 542,
+          "wins": 252,
+          "losses": 290,
+          "hitPct": 0.464945,
+          "profitUnits": -28.520077,
+          "roi": -0.05262
+        }
+      },
+      "sharedGamesOnly": {
+        "rSteamer": {
+          "games": 704,
+          "bets": 373,
+          "wins": 176,
+          "losses": 197,
+          "hitPct": 0.47185,
+          "profitUnits": -6.894976,
+          "roi": -0.018485
+        },
+        "rSteamerPN": {
+          "games": 704,
+          "bets": 404,
+          "wins": 185,
+          "losses": 219,
+          "hitPct": 0.457921,
+          "profitUnits": -16.338469,
+          "roi": -0.040442
+        },
+        "Steamer": {
+          "games": 704,
+          "bets": 434,
+          "wins": 206,
+          "losses": 228,
+          "hitPct": 0.474654,
+          "profitUnits": -10.212763,
+          "roi": -0.023532
+        },
+        "ZiPS": {
+          "games": 704,
+          "bets": 461,
+          "wins": 213,
+          "losses": 248,
+          "hitPct": 0.462039,
+          "profitUnits": -26.240919,
+          "roi": -0.056922
+        }
+      }
+    },
+    "0.05": {
+      "allCoveredGames": {
+        "rSteamer": {
+          "games": 834,
+          "bets": 196,
+          "wins": 90,
+          "losses": 106,
+          "hitPct": 0.459184,
+          "profitUnits": 0.706415,
+          "roi": 0.003604
+        },
+        "rSteamerPN": {
+          "games": 704,
+          "bets": 169,
+          "wins": 79,
+          "losses": 90,
+          "hitPct": 0.467456,
+          "profitUnits": 6.719565,
+          "roi": 0.039761
+        },
+        "Steamer": {
+          "games": 834,
+          "bets": 278,
+          "wins": 121,
+          "losses": 157,
+          "hitPct": 0.435252,
+          "profitUnits": -18.815039,
+          "roi": -0.06768
+        },
+        "ZiPS": {
+          "games": 834,
+          "bets": 291,
+          "wins": 131,
+          "losses": 160,
+          "hitPct": 0.450172,
+          "profitUnits": -14.749482,
+          "roi": -0.050686
+        }
+      },
+      "sharedGamesOnly": {
+        "rSteamer": {
+          "games": 704,
+          "bets": 166,
+          "wins": 77,
+          "losses": 89,
+          "hitPct": 0.463855,
+          "profitUnits": 2.354898,
+          "roi": 0.014186
+        },
+        "rSteamerPN": {
+          "games": 704,
+          "bets": 169,
+          "wins": 79,
+          "losses": 90,
+          "hitPct": 0.467456,
+          "profitUnits": 6.719565,
+          "roi": 0.039761
+        },
+        "Steamer": {
+          "games": 704,
+          "bets": 238,
+          "wins": 103,
+          "losses": 135,
+          "hitPct": 0.432773,
+          "profitUnits": -17.288987,
+          "roi": -0.072643
+        },
+        "ZiPS": {
+          "games": 704,
+          "bets": 252,
+          "wins": 115,
+          "losses": 137,
+          "hitPct": 0.456349,
+          "profitUnits": -10.855404,
+          "roi": -0.043077
+        }
+      }
+    }
+  }
+}

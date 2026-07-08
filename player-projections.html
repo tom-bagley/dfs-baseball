@@ -588,6 +588,15 @@
           Stack
           <input id="stackInput" class="stack-input" type="number" min="0" max="8" step="1" value="4">
         </label>
+        <label title="Spread player exposure across the ten builds: limit how many players any two builds may share, or cap how many builds a single player can appear in">
+          Diversity
+          <select id="diversityInput">
+            <option value="off">Off (true top 10)</option>
+            <option value="overlap-6">Max 6 shared</option>
+            <option value="overlap-4">Max 4 shared</option>
+            <option value="cap-50">Player cap 50%</option>
+          </select>
+        </label>
         <button id="maxPointsButton" type="button" class="file-button" title="Build the highest-scoring lineup (2 SP, 1 C, 1 1B, 1 2B, 1 3B, 1 SS, 3 OF) that fits the budget and stack requirement">
           Max Points
         </button>
@@ -707,6 +716,10 @@
       selectedGameKeys: new Set(),
     };
 
+    // Relative /api URLs only resolve when the page is served by the dev
+    // server; opened from file:// or an app preview pane, fall back to it.
+    const API_BASE = /^https?:$/.test(window.location.protocol) ? "" : "http://localhost:8000";
+
     const dateInput = document.querySelector("#dateInput");
     const refreshButton = document.querySelector("#refreshButton");
     const dkFileInput = document.querySelector("#dkFileInput");
@@ -721,6 +734,7 @@
     const positionRoleFilter = document.querySelector("#positionRoleFilter");
     const budgetInput = document.querySelector("#budgetInput");
     const stackInput = document.querySelector("#stackInput");
+    const diversityInput = document.querySelector("#diversityInput");
     const maxPointsButton = document.querySelector("#maxPointsButton");
     const optimizerShell = document.querySelector("#optimizerShell");
     const optimizerSummary = document.querySelector("#optimizerSummary");
@@ -843,7 +857,7 @@
     }
 
     async function refreshRequest(date) {
-      const response = await fetch("/api/refresh-player-projections", {
+      const response = await fetch(`${API_BASE}/api/refresh-player-projections`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ date }),
@@ -882,7 +896,7 @@
     }
 
     async function importDraftKingsRequest(date, csvText) {
-      const response = await fetch("/api/import-draftkings-salaries", {
+      const response = await fetch(`${API_BASE}/api/import-draftkings-salaries`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ date, csvText }),
@@ -995,7 +1009,8 @@
         }
       }
 
-      const builds = solveLineups(starters, hitters, budget, stackSize, MAX_BUILDS);
+      const diversity = diversitySettings(diversityInput.value, MAX_BUILDS);
+      const builds = solveLineups(starters, hitters, budget, stackSize, MAX_BUILDS, diversity);
 
       if (!builds.length) {
         optimizerShell.hidden = true;
@@ -1005,7 +1020,13 @@
       }
 
       const stackNote = stackSize > 1 ? ` with a ${stackSize}-hitter team stack` : "";
-      optimizerSummary.textContent = `Top ${builds.length} builds within ${formatSalary(budget)}${stackNote}: best ${builds[0].points.toFixed(2)} pts (2 SP, 1 C, 1 1B, 1 2B, 1 3B, 1 SS, 3 OF from ${starters.length + hitters.length} eligible players).`;
+      const diversityNote = !diversity
+        ? ""
+        : diversity.maxShared != null
+          ? `, max ${diversity.maxShared} shared players between builds`
+          : `, each player in at most ${diversity.maxAppearances} builds`;
+      const shortfallNote = diversity && builds.length < MAX_BUILDS ? ` Only ${builds.length} builds satisfy the diversity rule; relax it for more.` : "";
+      optimizerSummary.textContent = `Top ${builds.length} builds within ${formatSalary(budget)}${stackNote}${diversityNote}: best ${builds[0].points.toFixed(2)} pts (2 SP, 1 C, 1 1B, 1 2B, 1 3B, 1 SS, 3 OF from ${starters.length + hitters.length} eligible players).${shortfallNote}`;
       optimizerBody.innerHTML = builds.map((build, index) => {
         const stackCounts = new Map();
         for (const pick of build.lineup) {
@@ -1052,27 +1073,28 @@
     // knapsack over salary (in $100 units) x slot-fill state, then try every SP
     // pair against the best full-hitter set that fits the remaining budget.
     // Slot state = ofCount * 32 + bitmask(C, 1B, 2B, 3B, SS); 128 states total.
+    // No stack (size 0/1): the true top maxBuilds lineups via solveTopLineups,
+    // so the unstacked list is guaranteed to match or beat any stacked list at
+    // every rank.
     // A stack of K > 1 adds a state layer counting hitters from one candidate
     // team (saturating at K); the DP runs once per team deep enough to stack,
     // accepting only states where the count reached K. Each (stack team, SP
     // pair) combination yields its own optimal build; the top maxBuilds across
     // all combinations are returned, best first.
-    function solveLineups(starters, hitters, budget, stackSize, maxBuilds) {
+    function solveLineups(starters, hitters, budget, stackSize, maxBuilds, diversity) {
+      if (!(stackSize > 1)) return solveTopLineups(starters, hitters, budget, maxBuilds, diversity);
       const unit = 100;
       const cap = Math.floor(budget / unit);
       if (cap < 1) return [];
 
-      const K = stackSize > 1 ? Math.min(stackSize, 8) : 0;
-      let teams = [null];
-      if (K) {
-        const teamCounts = new Map();
-        for (const hitter of hitters) {
-          const team = hitter.row.teamAbbrev || "";
-          if (team) teamCounts.set(team, (teamCounts.get(team) || 0) + 1);
-        }
-        teams = [...teamCounts.keys()].filter((team) => teamCounts.get(team) >= K);
-        if (!teams.length) return [];
+      const K = Math.min(stackSize, 8);
+      const teamCounts = new Map();
+      for (const hitter of hitters) {
+        const team = hitter.row.teamAbbrev || "";
+        if (team) teamCounts.set(team, (teamCounts.get(team) || 0) + 1);
       }
+      const teams = [...teamCounts.keys()].filter((team) => teamCounts.get(team) >= K);
+      if (!teams.length) return [];
 
       const SLOT_STATES = 128;
       const LAYERS = K + 1;
@@ -1080,22 +1102,7 @@
       const FULL = K * SLOT_STATES + 127;
       if (hitters.length * (cap + 1) * STATES > 256 * 1024 * 1024) return []; // keep traceback memory sane
 
-      const transitions = HITTER_SLOTS.map((slot, k) => {
-        const list = [];
-        if (k === 5) {
-          for (let of = 1; of <= 3; of += 1) {
-            for (let bits = 0; bits < 32; bits += 1) list.push([of * 32 + bits, (of - 1) * 32 + bits]);
-          }
-        } else {
-          const bit = 1 << k;
-          for (let of = 0; of <= 3; of += 1) {
-            for (let bits = 0; bits < 32; bits += 1) {
-              if (bits & bit) list.push([of * 32 + bits, of * 32 + (bits ^ bit)]);
-            }
-          }
-        }
-        return list;
-      });
+      const transitions = slotTransitions();
 
       const weightOf = (row) => Math.max(1, Math.ceil(row.dkSalary / unit));
       const best = new Float64Array((cap + 1) * STATES);
@@ -1163,7 +1170,8 @@
         }
 
         // Every SP pair gets its own optimal build for this stack team; keep
-        // this team's best maxBuilds of them.
+        // this team's best of them (extras when a diversity rule will reject
+        // some downstream).
         const pairs = [];
         for (let i = 0; i < starters.length; i += 1) {
           for (let j = i + 1; j < starters.length; j += 1) {
@@ -1178,7 +1186,7 @@
         pairs.sort((a, b) => b[0] - a[0]);
 
         // Reconstruct now, before the next team's pass reuses the DP buffers.
-        for (const [total, pairI, pairJ, hitterIndex] of pairs.slice(0, maxBuilds)) {
+        for (const [total, pairI, pairJ, hitterIndex] of pairs.slice(0, diversity ? maxBuilds * 3 : maxBuilds)) {
           const lineup = [
             { slot: "P", row: starters[pairI] },
             { slot: "P", row: starters[pairJ] },
@@ -1205,16 +1213,12 @@
       candidates.sort((a, b) => b.points - a.points);
 
       const slotOrder = ["P", ...HITTER_SLOTS];
-      const seenBuilds = new Set();
+      const acceptor = buildAcceptor(diversity);
       const builds = [];
       for (const candidate of candidates) {
         if (builds.length >= maxBuilds) break;
-        const signature = candidate.lineup
-          .map((pick) => pick.row.dkId || `${pick.row.playerName}|${pick.row.teamAbbrev}`)
-          .sort()
-          .join("~");
-        if (seenBuilds.has(signature)) continue;
-        seenBuilds.add(signature);
+        if (acceptor.rejection(candidate.lineup)) continue;
+        acceptor.add(candidate.lineup);
         candidate.lineup.sort((a, b) => slotOrder.indexOf(a.slot) - slotOrder.indexOf(b.slot) || b.row.expectedPoints - a.row.expectedPoints);
         builds.push({
           points: candidate.points,
@@ -1223,6 +1227,337 @@
         });
       }
       return builds;
+    }
+
+    // Parse the Diversity <select> into solver settings; null = true top-N.
+    function diversitySettings(value, maxBuilds) {
+      if (value === "overlap-6") return { maxShared: 6, maxAppearances: null };
+      if (value === "overlap-4") return { maxShared: 4, maxAppearances: null };
+      if (value === "cap-50") return { maxShared: null, maxAppearances: Math.max(1, Math.round(maxBuilds / 2)) };
+      return null;
+    }
+
+    // Tracks accepted builds and enforces the diversity rule (plus duplicate
+    // rejection). rejection() returns null when a lineup is acceptable,
+    // otherwise the offending keys: any acceptable lineup must drop at least
+    // one of them (all of them, for an appearance cap).
+    function buildAcceptor(diversity) {
+      const acceptedKeySets = [];
+      const counts = new Map();
+      const seen = new Set();
+      const keysOf = (lineup) => lineup.map((pick) => lineupPlayerKey(pick.row));
+      return {
+        counts,
+        acceptedKeySets,
+        rejection(lineup) {
+          const keys = keysOf(lineup);
+          if (seen.has([...keys].sort().join("~"))) return { duplicate: true, keys: [] };
+          if (!diversity) return null;
+          if (diversity.maxShared != null) {
+            for (const prior of acceptedKeySets) {
+              const shared = keys.filter((key) => prior.has(key));
+              if (shared.length > diversity.maxShared) return { duplicate: false, keys: shared };
+            }
+          }
+          if (diversity.maxAppearances != null) {
+            const capped = keys.filter((key) => (counts.get(key) || 0) >= diversity.maxAppearances);
+            if (capped.length) return { duplicate: false, keys: capped };
+          }
+          return null;
+        },
+        add(lineup) {
+          const keys = keysOf(lineup);
+          seen.add([...keys].sort().join("~"));
+          acceptedKeySets.push(new Set(keys));
+          for (const key of keys) counts.set(key, (counts.get(key) || 0) + 1);
+        },
+      };
+    }
+
+    // Per-slot [state, prevState] pairs for adding one hitter at slot k.
+    function slotTransitions() {
+      return HITTER_SLOTS.map((slot, k) => {
+        const list = [];
+        if (k === 5) {
+          for (let of = 1; of <= 3; of += 1) {
+            for (let bits = 0; bits < 32; bits += 1) list.push([of * 32 + bits, (of - 1) * 32 + bits]);
+          }
+        } else {
+          const bit = 1 << k;
+          for (let of = 0; of <= 3; of += 1) {
+            for (let bits = 0; bits < 32; bits += 1) {
+              if (bits & bit) list.push([of * 32 + bits, of * 32 + (bits ^ bit)]);
+            }
+          }
+        }
+        return list;
+      });
+    }
+
+    function lineupPlayerKey(row) {
+      return row.dkId || `${row.playerName}|${row.teamAbbrev}`;
+    }
+
+    // True top-N lineups (no stack requirement) via Lawler partitioning: pop
+    // the best remaining lineup, then split its subspace into child
+    // subproblems that each keep a growing prefix of its players and ban the
+    // next one, so every runner-up is enumerated exactly once and rank r is
+    // the genuine r-th best lineup.
+    // With an appearance-cap rule, popped lineups that violate it are skipped
+    // but their subspaces still get explored minus the capped players, so
+    // each accepted build is still the best remaining lineup satisfying the
+    // rule. Overlap rules ("max N shared") branch too slowly to enumerate
+    // exactly and are handled by solveOverlapLineups instead.
+    function solveTopLineups(starters, hitters, budget, maxBuilds, diversity) {
+      const cap = Math.floor(budget / 100);
+      if (cap < 1) return [];
+      if (hitters.length * (cap + 1) * 128 > 256 * 1024 * 1024) return []; // keep traceback memory sane
+      const scratch = {
+        best: new Float64Array((cap + 1) * 128),
+        choice: new Uint8Array(hitters.length * (cap + 1) * 128),
+        transitions: slotTransitions(),
+      };
+      if (diversity && diversity.maxShared != null) {
+        return solveOverlapLineups(starters, hitters, budget, maxBuilds, diversity.maxShared, scratch);
+      }
+      const SOLVE_BUDGET = 300;
+      let solves = 0;
+      const solve = (includeKeys, excludeKeys) => {
+        solves += 1;
+        return solveBestLineup(starters, hitters, budget, includeKeys, excludeKeys, scratch);
+      };
+
+      const acceptor = buildAcceptor(diversity);
+      const root = solve(new Set(), new Set());
+      if (!root) return [];
+      const pool = [{ build: root, include: new Set(), exclude: new Set() }];
+      const builds = [];
+
+      const expand = (node, branchKeys) => {
+        const include = new Set(node.include);
+        for (const key of branchKeys) {
+          if (include.has(key)) continue;
+          if (solves >= SOLVE_BUDGET) return;
+          const exclude = new Set(node.exclude);
+          exclude.add(key);
+          const child = solve(new Set(include), exclude);
+          if (child) pool.push({ build: child, include: new Set(include), exclude });
+          include.add(key);
+        }
+      };
+
+      while (builds.length < maxBuilds && pool.length && solves < SOLVE_BUDGET) {
+        let top = 0;
+        for (let i = 1; i < pool.length; i += 1) {
+          if (pool[i].build.points > pool[top].build.points) top = i;
+        }
+        const [node] = pool.splice(top, 1);
+        const buildKeys = node.build.lineup.map((pick) => lineupPlayerKey(pick.row));
+        const rejection = acceptor.rejection(node.build.lineup);
+        if (!rejection) {
+          acceptor.add(node.build.lineup);
+          builds.push(node.build);
+          if (builds.length >= maxBuilds) break;
+          expand(node, buildKeys);
+          continue;
+        }
+        if (rejection.duplicate || !rejection.keys.length) {
+          expand(node, buildKeys); // safety net; the partition should never repeat a lineup
+          continue;
+        }
+        if (rejection.keys.some((key) => node.include.has(key))) continue; // offender is forced: subspace is dead
+        // Caps never loosen, so all capped players can be banned in one step.
+        const exclude = new Set(node.exclude);
+        for (const [key, count] of acceptor.counts) {
+          if (count >= diversity.maxAppearances) exclude.add(key);
+        }
+        const child = solve(new Set(node.include), exclude);
+        if (child) pool.push({ build: child, include: new Set(node.include), exclude });
+      }
+      return builds;
+    }
+
+    // Overlap-limited builds ("max N shared"): enumerating every next-best
+    // lineup under this rule branches too widely to stay exact, so each
+    // subsequent build is the best of several sound candidates. Banning any
+    // 10-N players of an accepted build guarantees at most N shared with it,
+    // so each strategy bans a different 10-N from every accepted build
+    // (most-exposed / weakest / priciest / rotating segment) and the
+    // highest-scoring candidate wins the slot.
+    function solveOverlapLineups(starters, hitters, budget, maxBuilds, maxShared, scratch) {
+      const first = solveBestLineup(starters, hitters, budget, new Set(), new Set(), scratch);
+      if (!first) return [];
+      const accepted = [first];
+      const counts = new Map();
+      const bump = (build) => {
+        for (const pick of build.lineup) {
+          const key = lineupPlayerKey(pick.row);
+          counts.set(key, (counts.get(key) || 0) + 1);
+        }
+      };
+      bump(first);
+
+      const drop = 10 - maxShared;
+      const strategies = [
+        (picks) => [...picks].sort((a, b) => (counts.get(b.key) || 0) - (counts.get(a.key) || 0) || a.points - b.points),
+        (picks) => [...picks].sort((a, b) => a.points - b.points),
+        (picks) => [...picks].sort((a, b) => b.salary - a.salary),
+        (picks, round) => {
+          const ranked = [...picks].sort((a, b) => b.points - a.points);
+          const offset = (round * drop) % ranked.length;
+          return ranked.slice(offset).concat(ranked.slice(0, offset));
+        },
+      ];
+
+      while (accepted.length < maxBuilds) {
+        let bestNext = null;
+        for (const strategy of strategies) {
+          const exclude = new Set();
+          for (const build of accepted) {
+            const picks = build.lineup.map((pick) => ({
+              key: lineupPlayerKey(pick.row),
+              points: pick.row.expectedPoints,
+              salary: pick.row.dkSalary,
+            }));
+            for (const pick of strategy(picks, accepted.length).slice(0, drop)) exclude.add(pick.key);
+          }
+          const candidate = solveBestLineup(starters, hitters, budget, new Set(), exclude, scratch);
+          if (candidate && (!bestNext || candidate.points > bestNext.points)) bestNext = candidate;
+        }
+        if (!bestNext) {
+          // Small pools can make every fixed strategy infeasible; retry with
+          // deterministic shuffled ban sets before declaring the list full.
+          for (let attempt = 1; attempt <= 8 && !bestNext; attempt += 1) {
+            const exclude = new Set();
+            const seed = accepted.length * 31 + attempt;
+            for (const build of accepted) {
+              const keys = build.lineup
+                .map((pick) => lineupPlayerKey(pick.row))
+                .sort((a, b) => hashKey(a, seed) - hashKey(b, seed));
+              for (const key of keys.slice(0, drop)) exclude.add(key);
+            }
+            bestNext = solveBestLineup(starters, hitters, budget, new Set(), exclude, scratch);
+          }
+        }
+        if (!bestNext) break;
+        accepted.push(bestNext);
+        bump(bestNext);
+      }
+      accepted.sort((a, b) => b.points - a.points);
+      return accepted;
+    }
+
+    // Deterministic string hash for reproducible shuffled ban sets.
+    function hashKey(text, seed) {
+      let h = seed >>> 0;
+      for (let i = 0; i < text.length; i += 1) {
+        h = Math.imul(h ^ text.charCodeAt(i), 2654435761);
+      }
+      return h >>> 0;
+    }
+
+    // One exact unconstrained solve honoring forced (includeKeys) and banned
+    // (excludeKeys) players, both keyed by lineupPlayerKey. Forced hitters get
+    // a large score boost so the optimum takes them whenever feasible; a
+    // forced player missing after reconstruction means the constraints cannot
+    // be satisfied. Returns the single best {points, salary, lineup} or null.
+    function solveBestLineup(starters, hitters, budget, includeKeys, excludeKeys, scratch) {
+      const unit = 100;
+      const cap = Math.floor(budget / unit);
+      const BOOST = 1e6;
+      const { best, choice, transitions } = scratch;
+      best.fill(-Infinity);
+      best[0] = 0;
+      choice.fill(0);
+
+      const weightOf = (row) => Math.max(1, Math.ceil(row.dkSalary / unit));
+      hitters.forEach((hitter, i) => {
+        const key = lineupPlayerKey(hitter.row);
+        if (excludeKeys.has(key)) return;
+        const weight = weightOf(hitter.row);
+        const points = hitter.row.expectedPoints + (includeKeys.has(key) ? BOOST : 0);
+        const base = i * (cap + 1) * 128;
+        for (let c = cap; c >= weight; c -= 1) {
+          const target = c * 128;
+          const source = (c - weight) * 128;
+          for (const k of hitter.slots) {
+            for (const [s, sPrev] of transitions[k]) {
+              const candidate = best[source + sPrev] + points;
+              if (candidate > best[target + s]) {
+                best[target + s] = candidate;
+                choice[base + target + s] = k + 1;
+              }
+            }
+          }
+        }
+      });
+
+      // bestHitterAt[c] = cheapest salary index c' <= c with the highest full-lineup score.
+      const bestHitterAt = new Int32Array(cap + 1).fill(-1);
+      let runningBest = -Infinity;
+      let runningIndex = -1;
+      for (let c = 0; c <= cap; c += 1) {
+        const value = best[c * 128 + 127];
+        if (value > runningBest) {
+          runningBest = value;
+          runningIndex = c;
+        }
+        bestHitterAt[c] = runningIndex;
+      }
+
+      const starterKeys = starters.map((row) => lineupPlayerKey(row));
+      const forcedStarterCount = starterKeys.filter((key) => includeKeys.has(key) && !excludeKeys.has(key)).length;
+      if (forcedStarterCount > 2) return null;
+
+      let bestTotal = -Infinity;
+      let bestPick = null;
+      for (let i = 0; i < starters.length; i += 1) {
+        if (excludeKeys.has(starterKeys[i])) continue;
+        const forcedI = includeKeys.has(starterKeys[i]) ? 1 : 0;
+        for (let j = i + 1; j < starters.length; j += 1) {
+          if (excludeKeys.has(starterKeys[j])) continue;
+          const forcedInPair = forcedI + (includeKeys.has(starterKeys[j]) ? 1 : 0);
+          if (forcedInPair < forcedStarterCount) continue;
+          const pairWeight = weightOf(starters[i]) + weightOf(starters[j]);
+          if (pairWeight > cap) continue;
+          const hitterIndex = bestHitterAt[cap - pairWeight];
+          if (hitterIndex < 0) continue;
+          const total = starters[i].expectedPoints + starters[j].expectedPoints + best[hitterIndex * 128 + 127];
+          if (total > bestTotal) {
+            bestTotal = total;
+            bestPick = [i, j, hitterIndex];
+          }
+        }
+      }
+      if (!bestPick) return null;
+
+      const [pairI, pairJ, hitterIndex] = bestPick;
+      const lineup = [
+        { slot: "P", row: starters[pairI] },
+        { slot: "P", row: starters[pairJ] },
+      ];
+      let c = hitterIndex;
+      let s = 127;
+      for (let i = hitters.length - 1; i >= 0; i -= 1) {
+        const picked = choice[i * (cap + 1) * 128 + c * 128 + s];
+        if (!picked) continue;
+        const k = picked - 1;
+        lineup.push({ slot: HITTER_SLOTS[k], row: hitters[i].row });
+        s = k === 5 ? s - 32 : s ^ (1 << k);
+        c -= weightOf(hitters[i].row);
+      }
+
+      const lineupKeys = new Set(lineup.map((pick) => lineupPlayerKey(pick.row)));
+      for (const key of includeKeys) {
+        if (!lineupKeys.has(key)) return null;
+      }
+      const slotOrder = ["P", ...HITTER_SLOTS];
+      lineup.sort((a, b) => slotOrder.indexOf(a.slot) - slotOrder.indexOf(b.slot) || b.row.expectedPoints - a.row.expectedPoints);
+      return {
+        points: lineup.reduce((sum, pick) => sum + pick.row.expectedPoints, 0),
+        salary: lineup.reduce((sum, pick) => sum + pick.row.dkSalary, 0),
+        lineup,
+      };
     }
 
     function applyFilterAndSort() {

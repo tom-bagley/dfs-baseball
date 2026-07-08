@@ -660,6 +660,10 @@
       activeCustomGame: null,
     };
 
+    // Relative /api URLs only resolve when the page is served by the dev
+    // server; opened from file:// or an app preview pane, fall back to it.
+    const API_BASE = /^https?:$/.test(window.location.protocol) ? "" : "http://localhost:8000";
+
     const dateInput = document.querySelector("#dateInput");
     const projectionSystemSelect = document.querySelector("#projectionSystemSelect");
     const refreshButton = document.querySelector("#refreshButton");
@@ -730,7 +734,7 @@
     }
 
     async function refreshRequest(date) {
-      const response = await fetch("/api/refresh-projections", {
+      const response = await fetch(`${API_BASE}/api/refresh-projections`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ date, lineType: "current", projectionSystem: projectionSystemSelect.value }),
@@ -982,7 +986,7 @@
     }
 
     async function customProjectionRequest(game, payload) {
-      const response = await fetch("/api/run-custom-projection", {
+      const response = await fetch(`${API_BASE}/api/run-custom-projection`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({

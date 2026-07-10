@@ -348,6 +348,100 @@
       width: 60px;
     }
 
+    .excluded-bar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 14px;
+      padding: 10px 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      box-shadow: var(--shadow);
+    }
+
+    .excluded-bar .excluded-label {
+      color: var(--muted);
+      font-size: 0.78rem;
+      font-weight: 800;
+      text-transform: uppercase;
+    }
+
+    #excludedChips {
+      display: inline-flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .excluded-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      min-height: 28px;
+      border-radius: 999px;
+      background: var(--bad-bg);
+      color: var(--bad-text);
+      padding: 2px 6px 2px 12px;
+      font-size: 0.82rem;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+
+    .excluded-chip button {
+      min-height: 20px;
+      width: 20px;
+      padding: 0;
+      border-radius: 50%;
+      background: transparent;
+      color: inherit;
+      font-size: 0.9rem;
+      line-height: 1;
+    }
+
+    .excluded-chip button:hover {
+      background: rgba(168, 50, 42, 0.15);
+    }
+
+    .clear-excluded {
+      min-height: 28px;
+      padding: 0 10px;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      color: var(--muted);
+      font-size: 0.78rem;
+    }
+
+    .clear-excluded:hover {
+      border-color: #aeb8c7;
+      color: var(--ink);
+    }
+
+    .exclude-toggle {
+      min-height: 20px;
+      width: 20px;
+      margin-left: 5px;
+      padding: 0;
+      border-radius: 50%;
+      background: transparent;
+      font-size: 0.72rem;
+      line-height: 1;
+      vertical-align: -1px;
+      opacity: 0.3;
+    }
+
+    .exclude-toggle:hover,
+    .exclude-toggle.active {
+      background: var(--bad-bg);
+      opacity: 1;
+    }
+
+    td.player.excluded-player {
+      color: var(--muted);
+      text-decoration: line-through;
+    }
+
     .build-players {
       min-width: 420px;
       line-height: 1.7;
@@ -603,6 +697,12 @@
       </div>
     </header>
 
+    <section id="excludedShell" class="excluded-bar" hidden aria-label="Players excluded from lineups">
+      <span class="excluded-label">Excluded from lineups</span>
+      <span id="excludedChips"></span>
+      <button id="clearExcludedButton" type="button" class="clear-excluded" title="Allow all excluded players in lineups again">Clear all</button>
+    </section>
+
     <section id="optimizerShell" class="table-shell optimizer" hidden aria-label="Max points result">
       <div class="table-top">
         <div id="optimizerSummary" class="status"></div>
@@ -739,6 +839,9 @@
     const optimizerShell = document.querySelector("#optimizerShell");
     const optimizerSummary = document.querySelector("#optimizerSummary");
     const optimizerBody = document.querySelector("#optimizerBody");
+    const excludedShell = document.querySelector("#excludedShell");
+    const excludedChips = document.querySelector("#excludedChips");
+    const clearExcludedButton = document.querySelector("#clearExcludedButton");
     const statusEl = document.querySelector("#status");
     const playerTable = document.querySelector("#playerTable");
     const tableBody = document.querySelector("#tableBody");
@@ -756,6 +859,28 @@
 
     maxPointsButton.addEventListener("click", () => {
       calculateMaxPoints();
+    });
+
+    optimizerBody.addEventListener("click", (event) => {
+      const button = event.target.closest("button[data-exclude-key]");
+      if (button) excludePlayer(button.dataset.excludeKey, button.dataset.excludeLabel);
+    });
+
+    tableBody.addEventListener("click", (event) => {
+      const button = event.target.closest("button[data-exclude-key]");
+      if (!button) return;
+      if (excludedPlayers.has(button.dataset.excludeKey)) unexcludePlayer(button.dataset.excludeKey);
+      else excludePlayer(button.dataset.excludeKey, button.dataset.excludeLabel);
+    });
+
+    excludedChips.addEventListener("click", (event) => {
+      const button = event.target.closest("button[data-exclude-key]");
+      if (button) unexcludePlayer(button.dataset.excludeKey);
+    });
+
+    clearExcludedButton.addEventListener("click", () => {
+      excludedPlayers.clear();
+      onExclusionsChanged();
     });
 
     dkFileInput.addEventListener("change", () => {
@@ -938,6 +1063,41 @@
     const OUTFIELD_ALIASES = new Set(["OF", "LF", "CF", "RF"]);
     const MAX_BUILDS = 10;
 
+    // Players banned from every build, keyed by lineupPlayerKey -> display name.
+    const excludedPlayers = new Map();
+
+    function excludePlayer(key, label) {
+      if (!key) return;
+      excludedPlayers.set(key, label || key);
+      onExclusionsChanged();
+    }
+
+    function unexcludePlayer(key) {
+      excludedPlayers.delete(key);
+      onExclusionsChanged();
+    }
+
+    function onExclusionsChanged() {
+      renderExcluded();
+      renderTable();
+      if (!optimizerShell.hidden) calculateMaxPoints();
+    }
+
+    function renderExcluded() {
+      excludedShell.hidden = !excludedPlayers.size;
+      excludedChips.innerHTML = [...excludedPlayers.entries()].map(([key, label]) => `
+        <span class="excluded-chip">${escapeHtml(label)}<button type="button" data-exclude-key="${escapeHtml(key)}" title="Allow ${escapeHtml(label)} in lineups again" aria-label="Allow ${escapeHtml(label)} in lineups again">&times;</button></span>
+      `).join("");
+    }
+
+    function excludeToggleButton(row) {
+      if (!row.playerName) return "";
+      const key = lineupPlayerKey(row);
+      const name = row.playerName;
+      const title = excludedPlayers.has(key) ? `Allow ${name} in lineups again` : `Exclude ${name} from all lineups`;
+      return `<button type="button" class="exclude-toggle${excludedPlayers.has(key) ? " active" : ""}" data-exclude-key="${escapeHtml(key)}" data-exclude-label="${escapeHtml(name)}" title="${escapeHtml(title)}" aria-label="${escapeHtml(title)}">&#128683;</button>`;
+    }
+
     function calculateMaxPoints() {
       const budget = Math.floor(Number(budgetInput.value));
       if (!Number.isFinite(budget) || budget <= 0) {
@@ -955,7 +1115,8 @@
       const players = state.rows.filter((row) => {
         if (typeof row.dkSalary !== "number" || row.dkSalary <= 0) return false;
         if (typeof row.expectedPoints !== "number" || !Number.isFinite(row.expectedPoints)) return false;
-        const key = row.dkId || `${row.playerName}|${row.teamAbbrev}`;
+        const key = lineupPlayerKey(row);
+        if (excludedPlayers.has(key)) return false;
         if (seen.has(key)) return false;
         seen.add(key);
         return true;
@@ -991,7 +1152,8 @@
       });
       if (shortfalls.length) {
         optimizerShell.hidden = true;
-        setStatus(`Not enough eligible players to fill the lineup: ${shortfalls.join(", ")}.`, true);
+        const excludeHint = excludedPlayers.size ? " Clearing excluded players may widen the pool." : "";
+        setStatus(`Not enough eligible players to fill the lineup: ${shortfalls.join(", ")}.${excludeHint}`, true);
         return;
       }
 
@@ -1015,18 +1177,22 @@
       if (!builds.length) {
         optimizerShell.hidden = true;
         const stackNote = stackSize > 1 ? ` with a ${stackSize}-hitter team stack` : "";
-        setStatus(`No valid lineup (2 SP, 1 C, 1 1B, 1 2B, 1 3B, 1 SS, 3 OF)${stackNote} fits within ${formatSalary(budget)}. Try raising the budget or lowering the stack size.`, true);
+        const excludeHint = excludedPlayers.size ? ", clearing excluded players," : "";
+        setStatus(`No valid lineup (2 SP, 1 C, 1 1B, 1 2B, 1 3B, 1 SS, 3 OF)${stackNote} fits within ${formatSalary(budget)}. Try raising the budget${excludeHint} or lowering the stack size.`, true);
         return;
       }
 
       const stackNote = stackSize > 1 ? ` with a ${stackSize}-hitter team stack` : "";
+      const excludeNote = excludedPlayers.size
+        ? `, excluding ${excludedPlayers.size === 1 ? [...excludedPlayers.values()][0] : `${excludedPlayers.size} players`}`
+        : "";
       const diversityNote = !diversity
         ? ""
         : diversity.maxShared != null
           ? `, max ${diversity.maxShared} shared players between builds`
           : `, each player in at most ${diversity.maxAppearances} builds`;
       const shortfallNote = diversity && builds.length < MAX_BUILDS ? ` Only ${builds.length} builds satisfy the diversity rule; relax it for more.` : "";
-      optimizerSummary.textContent = `Top ${builds.length} builds within ${formatSalary(budget)}${stackNote}${diversityNote}: best ${builds[0].points.toFixed(2)} pts (2 SP, 1 C, 1 1B, 1 2B, 1 3B, 1 SS, 3 OF from ${starters.length + hitters.length} eligible players).${shortfallNote}`;
+      optimizerSummary.textContent = `Top ${builds.length} builds within ${formatSalary(budget)}${stackNote}${diversityNote}${excludeNote}: best ${builds[0].points.toFixed(2)} pts (2 SP, 1 C, 1 1B, 1 2B, 1 3B, 1 SS, 3 OF from ${starters.length + hitters.length} eligible players).${shortfallNote}`;
       optimizerBody.innerHTML = builds.map((build, index) => {
         const stackCounts = new Map();
         for (const pick of build.lineup) {
@@ -1035,9 +1201,13 @@
           if (team) stackCounts.set(team, (stackCounts.get(team) || 0) + 1);
         }
         const [stackTeam, stackCount] = [...stackCounts.entries()].sort((a, b) => b[1] - a[1])[0] || ["", 0];
-        const players = build.lineup.map((pick) => `
-          <span class="build-player"><span class="slot-tag">${escapeHtml(pick.slot)}</span>${escapeHtml(pick.row.playerName || "--")}</span>
-        `).join("");
+        const players = build.lineup.map((pick) => {
+          const name = pick.row.playerName || "--";
+          const key = lineupPlayerKey(pick.row);
+          return `
+            <span class="build-player"><span class="slot-tag">${escapeHtml(pick.slot)}</span>${escapeHtml(name)}<button type="button" class="exclude-toggle" data-exclude-key="${escapeHtml(key)}" data-exclude-label="${escapeHtml(name)}" title="Exclude ${escapeHtml(name)} from all lineups and rebuild" aria-label="Exclude ${escapeHtml(name)} from all lineups and rebuild">&#128683;</button></span>
+          `;
+        }).join("");
         return `
           <tr>
             <td class="num">${index + 1}</td>
@@ -1624,7 +1794,7 @@
       tableBody.innerHTML = state.filteredRows.map((row) => `
         <tr>
           <td>${escapeHtml(row.displayTime)}</td>
-          <td class="player">${escapeHtml(row.playerName || row.error || "--")}${confirmedLineupMarker(row)}</td>
+          <td class="player${row.playerName && excludedPlayers.has(lineupPlayerKey(row)) ? " excluded-player" : ""}">${escapeHtml(row.playerName || row.error || "--")}${confirmedLineupMarker(row)}${excludeToggleButton(row)}</td>
           <td><span class="abbrev">${escapeHtml(row.teamAbbrev || "--")}</span>${escapeHtml(row.team || "")}</td>
           <td>${escapeHtml(row.opponentAbbrev || row.opponent || "")}</td>
           <td class="num hitter-col">${formatWhole(row.lineupSlot)}</td>

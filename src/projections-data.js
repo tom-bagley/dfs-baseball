@@ -13,6 +13,24 @@ const ESPN_CORE_BASE_URL = 'https://sports.core.api.espn.com/v2/sports/baseball/
 const DEFAULT_PROJECTION_SYSTEM = 'rSteamer';
 const DEFAULT_LINE_TYPE = 'current';
 const DISPLAY_TIME_ZONE = 'America/Chicago';
+const DK_LOBBY_URL = 'https://www.draftkings.com/lobby/getcontests?sport=MLB';
+const DK_DRAFTABLES_BASE_URL = 'https://api.draftkings.com/draftgroups/v1/draftgroups';
+// MLB Classic (2 P, C, 1B, 2B, 3B, SS, 3 OF) — the format the lineup optimizer builds.
+const DK_CLASSIC_CONTEST_TYPE_ID = 28;
+const DK_FPPG_STAT_ID = 408;
+const DK_ROSTER_SLOT_NAMES = new Map([
+  [110, 'P'],
+  [111, 'C'],
+  [112, '1B'],
+  [113, '2B'],
+  [114, '3B'],
+  [115, 'SS'],
+  [116, 'OF'],
+]);
+const DK_HEADERS = {
+  accept: 'application/json, text/plain, */*',
+  'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36',
+};
 
 const TEAM_ALIASES = new Map([
   ['AZ', 'ARI'],
@@ -209,6 +227,61 @@ export async function importDraftKingsSalaries({
     ok: true,
     date,
     source: 'DraftKings',
+    rows: rows.length,
+    importedAt: payload.importedAt,
+  };
+}
+
+export async function getDraftKingsSlates({ date } = {}) {
+  validateDate(date);
+
+  const data = await fetchJson(DK_LOBBY_URL, DK_HEADERS);
+  const groups = Array.isArray(data?.DraftGroups) ? data.DraftGroups : [];
+  const slates = groups
+    .filter((group) => group?.ContestTypeId === DK_CLASSIC_CONTEST_TYPE_ID)
+    .filter((group) => String(group?.StartDateEst || '').slice(0, 10) === date)
+    .map(buildDraftKingsSlateOption)
+    .sort((a, b) => a.sortOrder - b.sortOrder
+      || b.gameCount - a.gameCount
+      || a.startTimeEst.localeCompare(b.startTimeEst));
+
+  return {
+    ok: true,
+    date,
+    sport: 'MLB',
+    slates,
+    fetchedAt: new Date().toISOString(),
+  };
+}
+
+export async function fetchDraftKingsSalaries({ date, draftGroupId } = {}) {
+  validateDate(date);
+  const groupId = Number(draftGroupId);
+  if (!Number.isInteger(groupId) || groupId <= 0) {
+    throw new Error('Select a DraftKings slate first.');
+  }
+
+  const url = `${DK_DRAFTABLES_BASE_URL}/${groupId}/draftables?format=json`;
+  const data = await fetchJson(url, DK_HEADERS);
+  const rows = parseDraftKingsDraftables(data);
+  if (!rows.length) {
+    throw new Error('DraftKings returned no priced players for that slate.');
+  }
+
+  const payload = {
+    date,
+    source: 'DraftKings',
+    draftGroupId: groupId,
+    rows,
+    importedAt: new Date().toISOString(),
+  };
+  await writeCachedJson(draftKingsSalaryCachePath(date), payload);
+
+  return {
+    ok: true,
+    date,
+    source: 'DraftKings',
+    draftGroupId: groupId,
     rows: rows.length,
     importedAt: payload.importedAt,
   };
@@ -834,6 +907,105 @@ function parseDraftKingsSalaryCsv(csvText) {
       };
     })
     .filter((row) => row.name && row.teamAbbrev && typeof row.salary === 'number');
+}
+
+function buildDraftKingsSlateOption(group) {
+  const startTimeEst = String(group?.StartDateEst || '');
+  const suffix = String(group?.ContestStartTimeSuffix || '').trim();
+  const gameCount = Number(group?.GameCount) || 0;
+  const timeLabel = formatSlateTimeLabel(startTimeEst);
+  const parts = [];
+  if (timeLabel) parts.push(`${timeLabel} ET`);
+  if (gameCount) parts.push(`${gameCount} game${gameCount === 1 ? '' : 's'}`);
+
+  return {
+    draftGroupId: group?.DraftGroupId,
+    label: `${parts.join(' · ')}${suffix ? ` ${suffix}` : ''}`.trim() || `Slate ${group?.DraftGroupId}`,
+    startTimeEst,
+    gameCount,
+    suffix,
+    tag: String(group?.DraftGroupTag || ''),
+    sortOrder: Number(group?.SortOrder) || 999,
+  };
+}
+
+function formatSlateTimeLabel(startTimeEst) {
+  const match = /T(\d{2}):(\d{2})/.exec(startTimeEst);
+  if (!match) return '';
+  const hours = Number(match[1]);
+  const suffix = hours >= 12 ? 'PM' : 'AM';
+  return `${hours % 12 || 12}:${match[2]} ${suffix}`;
+}
+
+function parseDraftKingsDraftables(data) {
+  const stats = Array.isArray(data?.draftStats) ? data.draftStats : [];
+  const fppgStatId = stats.find((entry) => String(entry?.abbr || '').toUpperCase() === 'FPPG')?.id
+    ?? DK_FPPG_STAT_ID;
+  const draftables = Array.isArray(data?.draftables) ? data.draftables : [];
+  const byPlayer = new Map();
+
+  // Multi-eligible players repeat once per roster slot; collapse to one row
+  // with the slot names joined the way the salary CSV formats them.
+  for (const raw of draftables) {
+    const name = cleanDraftKingsName(raw?.displayName || `${raw?.firstName || ''} ${raw?.lastName || ''}`);
+    const teamAbbrev = normalizeTeam(raw?.teamAbbreviation);
+    const salary = Number(raw?.salary);
+    if (!name || !teamAbbrev || !Number.isFinite(salary) || salary <= 0 || raw?.isDisabled) continue;
+
+    const key = raw?.playerId ?? raw?.playerDkId ?? `${name}|${teamAbbrev}`;
+    let entry = byPlayer.get(key);
+    if (!entry) {
+      entry = {
+        row: {
+          name,
+          normalizedName: normalizePlayerName(name),
+          id: stringifyId(raw?.draftableId ?? raw?.playerDkId ?? raw?.playerId),
+          rosterPosition: '',
+          position: String(raw?.position || '').trim(),
+          salary,
+          gameInfo: formatDraftKingsGameInfo(raw?.competition),
+          teamAbbrev,
+          avgPointsPerGame: parseDraftKingsFppg(raw?.draftStatAttributes, fppgStatId),
+        },
+        slotIds: new Set(),
+      };
+      byPlayer.set(key, entry);
+    }
+    if (raw?.rosterSlotId != null) entry.slotIds.add(raw.rosterSlotId);
+  }
+
+  return [...byPlayer.values()].map(({ row, slotIds }) => {
+    const slotNames = [...slotIds].map((slotId) => DK_ROSTER_SLOT_NAMES.get(slotId)).filter(Boolean);
+    row.rosterPosition = slotNames.join('/') || row.position;
+    return row;
+  });
+}
+
+function formatDraftKingsGameInfo(competition) {
+  const matchup = String(competition?.name || '').replace(/\s*@\s*/, '@').trim();
+  const startTime = competition?.startTime ? new Date(competition.startTime) : null;
+  if (!startTime || Number.isNaN(startTime.getTime())) return matchup;
+
+  const datePart = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(startTime);
+  const timePart = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+  }).format(startTime).replace(/\s/g, '');
+
+  return `${matchup} ${datePart} ${timePart} ET`.trim();
+}
+
+function parseDraftKingsFppg(attributes, fppgStatId) {
+  const list = Array.isArray(attributes) ? attributes : [];
+  const match = list.find((attr) => attr?.id === fppgStatId);
+  return parseNullableNumber(match?.value);
 }
 
 function parseCsv(text = '') {

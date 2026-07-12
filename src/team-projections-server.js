@@ -4,6 +4,8 @@ import { createServer } from 'node:http';
 import { extname, normalize, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
+  fetchDraftKingsSalaries,
+  getDraftKingsSlates,
   getPlayerProjectionSlate,
   getProjectionSlate,
   importDraftKingsSalaries,
@@ -43,6 +45,16 @@ const server = createServer(async (request, response) => {
 
     if (request.method === 'POST' && url.pathname === '/api/import-draftkings-salaries') {
       await handleImportDraftKingsSalaries(request, response);
+      return;
+    }
+
+    if (request.method === 'GET' && url.pathname === '/api/draftkings-slates') {
+      await handleDraftKingsSlates(url, response);
+      return;
+    }
+
+    if (request.method === 'POST' && url.pathname === '/api/fetch-draftkings-salaries') {
+      await handleFetchDraftKingsSalaries(request, response);
       return;
     }
 
@@ -148,6 +160,53 @@ async function handleImportDraftKingsSalaries(request, response) {
     sendJson(response, 400, {
       error: formatError(error),
       phase: 'draftkings-import',
+    });
+  }
+}
+
+async function handleDraftKingsSlates(url, response) {
+  const date = String(url.searchParams.get('date') || '').trim();
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    sendJson(response, 400, { error: 'Use a date in YYYY-MM-DD format.' });
+    return;
+  }
+
+  try {
+    const result = await getDraftKingsSlates({ date });
+    sendJson(response, 200, result);
+  } catch (error) {
+    sendJson(response, 502, {
+      error: formatError(error),
+      phase: 'draftkings-slates',
+      hint: 'The server is running, but the DraftKings lobby request failed.',
+    });
+  }
+}
+
+async function handleFetchDraftKingsSalaries(request, response) {
+  const body = await readJsonBody(request);
+  const date = String(body.date || '').trim();
+  const draftGroupId = Number(body.draftGroupId);
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    sendJson(response, 400, { error: 'Use a date in YYYY-MM-DD format.' });
+    return;
+  }
+
+  if (!Number.isInteger(draftGroupId) || draftGroupId <= 0) {
+    sendJson(response, 400, { error: 'Select a DraftKings slate first.' });
+    return;
+  }
+
+  try {
+    const result = await fetchDraftKingsSalaries({ date, draftGroupId });
+    sendJson(response, 200, result);
+  } catch (error) {
+    sendJson(response, 502, {
+      error: formatError(error),
+      phase: 'draftkings-fetch',
+      hint: 'The server is running, but the DraftKings draftables request failed.',
     });
   }
 }

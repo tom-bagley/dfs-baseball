@@ -170,6 +170,15 @@
       border-color: #aeb8c7;
     }
 
+    .slate-select {
+      max-width: 240px;
+    }
+
+    .slate-select:disabled {
+      cursor: default;
+      opacity: 0.65;
+    }
+
     button.primary {
       background: var(--accent);
       color: #fff;
@@ -244,10 +253,6 @@
 
     .search {
       width: min(320px, 100%);
-    }
-
-    .type-filter {
-      width: 132px;
     }
 
     .game-filter {
@@ -620,8 +625,7 @@
       input[type="date"],
       .search,
       .game-filter,
-      .position-role-filter,
-      .type-filter {
+      .position-role-filter {
         width: 100%;
       }
 
@@ -667,7 +671,13 @@
           Date
           <input id="dateInput" type="date">
         </label>
-        <label class="file-button" title="Import DraftKings salary CSV for the selected date">
+        <label title="Load DraftKings salaries automatically for one of the day's classic slates">
+          DK Slate
+          <select id="dkSlateSelect" class="slate-select" autocomplete="off">
+            <option value="">Loading slates...</option>
+          </select>
+        </label>
+        <label class="file-button" title="Import DraftKings salary CSV for the selected date (fallback if automatic slates are unavailable)">
           DK CSV
           <input id="dkFileInput" type="file" accept=".csv,text/csv">
         </label>
@@ -747,10 +757,6 @@
         <div id="status" class="status">Choose a date and refresh player projections.</div>
         <div class="filters">
           <input id="searchInput" class="search" type="search" placeholder="Filter player, team, or opponent">
-          <select id="typeFilter" class="type-filter" aria-label="Player type filter">
-            <option value="hitter">Hitters</option>
-            <option value="pitcher">Pitchers</option>
-          </select>
           <div id="gameFilter" class="game-filter">
             <button id="gameFilterButton" class="filter-menu-button" type="button" aria-haspopup="true" aria-expanded="false">
               All games
@@ -764,7 +770,8 @@
             </div>
           </div>
           <select id="positionRoleFilter" class="position-role-filter" aria-label="Position filter">
-            <option value="">All positions</option>
+            <option value="hitter">All hitters</option>
+            <option value="pitcher">P</option>
           </select>
         </div>
       </div>
@@ -822,9 +829,9 @@
 
     const dateInput = document.querySelector("#dateInput");
     const refreshButton = document.querySelector("#refreshButton");
+    const dkSlateSelect = document.querySelector("#dkSlateSelect");
     const dkFileInput = document.querySelector("#dkFileInput");
     const searchInput = document.querySelector("#searchInput");
-    const typeFilter = document.querySelector("#typeFilter");
     const gameFilter = document.querySelector("#gameFilter");
     const gameFilterButton = document.querySelector("#gameFilterButton");
     const gameFilterMenu = document.querySelector("#gameFilterMenu");
@@ -853,8 +860,19 @@
 
     dateInput.value = localDateString(new Date());
 
+    let dkSlates = [];
+
     refreshButton.addEventListener("click", () => {
       refreshPlayers(dateInput.value);
+    });
+
+    dateInput.addEventListener("change", () => {
+      loadDkSlates(dateInput.value);
+    });
+
+    dkSlateSelect.addEventListener("change", () => {
+      const draftGroupId = Number(dkSlateSelect.value);
+      if (draftGroupId) importDraftKingsSlate(draftGroupId);
     });
 
     maxPointsButton.addEventListener("click", () => {
@@ -890,13 +908,6 @@
     });
 
     searchInput.addEventListener("input", () => {
-      applyFilterAndSort();
-      renderTable();
-    });
-
-    typeFilter.addEventListener("change", () => {
-      updateViewMode();
-      populatePositionRoleFilter(true);
       applyFilterAndSort();
       renderTable();
     });
@@ -944,6 +955,7 @@
     });
 
     positionRoleFilter.addEventListener("change", () => {
+      updateViewMode();
       applyFilterAndSort();
       renderTable();
     });
@@ -986,6 +998,80 @@
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ date }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(result.error || `HTTP ${response.status}`);
+      }
+      return result;
+    }
+
+    async function loadDkSlates(date) {
+      dkSlates = [];
+
+      if (!date) {
+        renderDkSlateOptions("Pick a date for DK slates");
+        return;
+      }
+
+      renderDkSlateOptions("Loading DK slates...");
+
+      try {
+        const response = await fetch(`${API_BASE}/api/draftkings-slates?date=${encodeURIComponent(date)}`);
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(result.error || `HTTP ${response.status}`);
+        }
+        dkSlates = Array.isArray(result.slates) ? result.slates : [];
+        renderDkSlateOptions(dkSlates.length ? "Select DK slate..." : "No DK slates for this date");
+      } catch (error) {
+        renderDkSlateOptions("DK slates unavailable");
+        setStatus(`Could not load DraftKings slates. ${formatError(error)} Use the DK CSV upload instead.`, true);
+      }
+    }
+
+    function renderDkSlateOptions(placeholder) {
+      const options = [`<option value="">${escapeHtml(placeholder)}</option>`];
+      for (const slate of dkSlates) {
+        options.push(`<option value="${escapeHtml(String(slate.draftGroupId))}">${escapeHtml(slate.label)}</option>`);
+      }
+      dkSlateSelect.innerHTML = options.join("");
+      dkSlateSelect.disabled = !dkSlates.length;
+    }
+
+    async function importDraftKingsSlate(draftGroupId) {
+      const date = dateInput.value;
+      if (!date) {
+        setStatus("Pick a date before loading DraftKings salaries.", true);
+        return;
+      }
+
+      const slate = dkSlates.find((entry) => Number(entry.draftGroupId) === draftGroupId);
+      const label = slate ? slate.label : `slate ${draftGroupId}`;
+
+      setBusy(true);
+      setStatus(`Fetching DraftKings salaries for ${label}...`);
+
+      try {
+        const result = await fetchDkSalariesRequest(date, draftGroupId);
+        setStatus(`Loaded ${result.rows} DraftKings salaries from ${label}. Refreshing table...`);
+        if (state.rows.length) {
+          await refreshPlayers(date);
+        } else {
+          setStatus(`Loaded ${result.rows} DraftKings salaries from ${label}. Click Refresh to join them to projections.`);
+        }
+      } catch (error) {
+        setStatus(`Could not fetch DraftKings salaries. ${formatError(error)}`, true);
+      } finally {
+        setBusy(false);
+      }
+    }
+
+    async function fetchDkSalariesRequest(date, draftGroupId) {
+      const response = await fetch(`${API_BASE}/api/fetch-draftkings-salaries`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ date, draftGroupId }),
       });
       const result = await response.json().catch(() => ({}));
       if (!response.ok) {
@@ -1041,6 +1127,7 @@
       state.cache = result.cache || null;
       searchInput.value = "";
       populateGameFilter(true);
+      const slateGameCount = restrictGamesToDkSlate();
       populatePositionRoleFilter(true);
       updateViewMode();
       applyFilterAndSort();
@@ -1054,7 +1141,8 @@
 
       const gameCount = new Set(playerRows.map((row) => row.gameKey || row.mlbGameId || row.gameId).filter(Boolean)).size;
       const errorCount = playerRows.filter((row) => row.error).length;
-      setStatus(`Loaded ${playerRows.length} players from ${gameCount} games${errorCount ? `; ${errorCount} rows have notes` : ""}. ${cacheSummary(result.cache)}`);
+      const slateNote = slateGameCount ? ` Showing the ${slateGameCount} DK slate games.` : "";
+      setStatus(`Loaded ${playerRows.length} players from ${gameCount} games${errorCount ? `; ${errorCount} rows have notes` : ""}. ${cacheSummary(result.cache)}${slateNote}`);
     }
 
     // Roster: 2 SP plus 1 C, 1 1B, 1 2B, 1 3B, 1 SS, 3 OF.
@@ -1205,7 +1293,7 @@
           const name = pick.row.playerName || "--";
           const key = lineupPlayerKey(pick.row);
           return `
-            <span class="build-player"><span class="slot-tag">${escapeHtml(pick.slot)}</span>${escapeHtml(name)}<button type="button" class="exclude-toggle" data-exclude-key="${escapeHtml(key)}" data-exclude-label="${escapeHtml(name)}" title="Exclude ${escapeHtml(name)} from all lineups and rebuild" aria-label="Exclude ${escapeHtml(name)} from all lineups and rebuild">&#128683;</button></span>
+            <span class="build-player"><span class="slot-tag">${escapeHtml(pick.slot)}</span>${escapeHtml(name)}${confirmedLineupMarker(pick.row)}<button type="button" class="exclude-toggle" data-exclude-key="${escapeHtml(key)}" data-exclude-label="${escapeHtml(name)}" title="Exclude ${escapeHtml(name)} from all lineups and rebuild" aria-label="Exclude ${escapeHtml(name)} from all lineups and rebuild">&#128683;</button></span>
           `;
         }).join("");
         return `
@@ -1732,14 +1820,14 @@
 
     function applyFilterAndSort() {
       const query = searchInput.value.trim().toLowerCase();
-      const type = typeFilter.value;
+      const { type, positionOrRole } = selectedPositionFilter();
       const selectedGameKeys = state.selectedGameKeys;
-      const positionOrRole = positionRoleFilter.value;
       const hasGameOptions = availableGameKeys().length > 0;
       ensureVisibleSort();
       state.filteredRows = state.rows
         .filter((row) => {
           if (row.playerType !== type) return false;
+          if (type === "pitcher" && !isRosterablePitcher(row)) return false;
           if (hasGameOptions && !selectedGameKeys.has(rowGameKey(row))) return false;
           if (positionOrRole && !rowPositionOrRoleValues(row).includes(positionOrRole)) return false;
           if (!query) return true;
@@ -1928,6 +2016,25 @@
       updateGameOptionChecks();
     }
 
+    // DK salary rows only exist for teams in the loaded slate, so games with
+    // no priced players are outside the slate; hide them by default while
+    // leaving the game filter available to bring them back.
+    function restrictGamesToDkSlate() {
+      const slateKeys = new Set(state.rows
+        .filter((row) => typeof row.dkSalary === "number" && row.dkSalary > 0)
+        .map(rowGameKey)
+        .filter(Boolean));
+      if (!slateKeys.size) return 0;
+
+      const allKeys = availableGameKeys();
+      const selected = allKeys.filter((key) => slateKeys.has(key));
+      if (!selected.length || selected.length === allKeys.length) return 0;
+
+      state.selectedGameKeys = new Set(selected);
+      updateGameOptionChecks();
+      return selected.length;
+    }
+
     function closeGameFilterMenu() {
       gameFilterMenu.hidden = true;
       gameFilterButton.setAttribute("aria-expanded", "false");
@@ -1957,27 +2064,35 @@
       }
     }
 
+    // One combined position dropdown: hitter positions plus P as another
+    // position. Option values encode the player type ("hitter", "hitter:1B",
+    // "pitcher", "pitcher:Starter") because the table columns swap with type.
+    function selectedPositionFilter() {
+      const [type, ...rest] = String(positionRoleFilter.value || "hitter").split(":");
+      return { type: type === "pitcher" ? "pitcher" : "hitter", positionOrRole: rest.join(":") };
+    }
+
     function populatePositionRoleFilter(reset = false) {
-      const selected = reset ? "" : positionRoleFilter.value;
-      const type = typeFilter.value;
-      const values = [...new Set(state.rows
-        .filter((row) => row.playerType === type)
+      const selected = reset ? selectedPositionFilter().type : positionRoleFilter.value;
+
+      const hitterValues = [...new Set(state.rows
+        .filter((row) => row.playerType === "hitter")
         .flatMap(rowPositionOrRoleValues)
-        .filter((value) => shouldShowPositionRoleOption(type, value)))]
+        .filter((value) => shouldShowPositionRoleOption("hitter", value)))]
         .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
 
-      const allLabel = type === "pitcher" ? "All roles" : "All positions";
-      positionRoleFilter.setAttribute("aria-label", type === "pitcher" ? "Pitcher role filter" : "Hitter position filter");
       positionRoleFilter.innerHTML = [
-        `<option value="">${allLabel}</option>`,
-        ...values.map((value) => `<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`),
+        `<option value="hitter">All hitters</option>`,
+        ...hitterValues.map((value) => `<option value="hitter:${escapeHtml(value)}">${escapeHtml(value)}</option>`),
+        `<option value="pitcher">P</option>`,
       ].join("");
 
-      positionRoleFilter.value = values.includes(selected) ? selected : "";
+      positionRoleFilter.value = selected;
+      if (!positionRoleFilter.value) positionRoleFilter.value = "hitter";
     }
 
     function updateViewMode() {
-      playerTable.dataset.viewType = typeFilter.value;
+      playerTable.dataset.viewType = selectedPositionFilter().type;
       ensureVisibleSort();
     }
 
@@ -1991,15 +2106,21 @@
       const common = ["displayTime", "playerName", "teamAbbrev", "opponentAbbrev", "expectedPoints", "dkSalary", "dkValue", "dkDollarsPerPoint", "dkRosterPosition", "status"];
       const hitter = ["lineupSlot", "position", "hitterPoints", "homeRuns", "runsBattedIn", "runs", "stolenBases"];
       const pitcher = ["role", "pitcherPoints", "inningsPitched", "strikeouts", "win", "earnedRunsAllowed"];
-      return new Set([...common, ...(typeFilter.value === "pitcher" ? pitcher : hitter)]);
+      return new Set([...common, ...(selectedPositionFilter().type === "pitcher" ? pitcher : hitter)]);
     }
 
     function visibleColumnCount() {
-      return typeFilter.value === "pitcher" ? 16 : 17;
+      return selectedPositionFilter().type === "pitcher" ? 16 : 17;
     }
 
     function rowGameKey(row) {
       return String(row.gameKey || row.mlbGameId || row.gameId || "");
+    }
+
+    // The P option covers the pitchers you can start in DK's P slots:
+    // projected starters and primary (bulk) pitchers, not the rest of the pen.
+    function isRosterablePitcher(row) {
+      return ["starter", "primary pitcher"].includes(String(row.role || "").trim().toLowerCase());
     }
 
     function rowPositionOrRoleValues(row) {
@@ -2010,7 +2131,7 @@
     function shouldShowPositionRoleOption(type, value) {
       if (!value) return false;
       if (type !== "hitter") return true;
-      return !["CF", "DH", "LF", "RF"].includes(String(value).trim().toUpperCase());
+      return !["CF", "DH", "LF", "RF", "P", "SP", "RP"].includes(String(value).trim().toUpperCase());
     }
 
     function splitPositionEligibility(value) {
@@ -2029,6 +2150,7 @@
 
     updateViewMode();
     updateHeaderState();
+    loadDkSlates(dateInput.value);
   </script>
 </body>
 </html>

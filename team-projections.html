@@ -115,7 +115,6 @@
     }
 
     input[type="date"],
-    input[type="search"],
     select,
     .custom-input {
       border: 1px solid var(--line);
@@ -230,10 +229,6 @@
     .status.error {
       color: var(--bad-text);
       font-weight: 700;
-    }
-
-    .search {
-      width: min(320px, 100%);
     }
 
     .table-wrap {
@@ -542,10 +537,6 @@
         grid-template-columns: 1fr;
       }
 
-      .search {
-        width: 100%;
-      }
-
       .table-wrap {
         max-height: none;
       }
@@ -620,7 +611,6 @@
     <section class="table-shell">
       <div class="table-top">
         <div id="status" class="status">Choose a date and refresh projections.</div>
-        <input id="searchInput" class="search" type="search" placeholder="Filter team or opponent">
       </div>
       <div class="table-wrap">
         <table>
@@ -685,7 +675,6 @@
     const dateInput = document.querySelector("#dateInput");
     const projectionSystemSelect = document.querySelector("#projectionSystemSelect");
     const refreshButton = document.querySelector("#refreshButton");
-    const searchInput = document.querySelector("#searchInput");
     const statusEl = document.querySelector("#status");
     const tableBody = document.querySelector("#tableBody");
     const teamsMetric = document.querySelector("#teamsMetric");
@@ -704,11 +693,6 @@
 
     refreshButton.addEventListener("click", () => {
       refreshProjections(dateInput.value);
-    });
-
-    searchInput.addEventListener("input", () => {
-      applyFilterAndSort();
-      renderTable();
     });
 
     customCloseButton.addEventListener("click", closeCustomEditor);
@@ -772,7 +756,6 @@
       state.cache = result.cache || null;
       state.gamesByKey = indexGames(result.games || []);
       state.activeCustomGame = null;
-      searchInput.value = "";
       applyFilterAndSort();
       renderMetrics();
       renderTable();
@@ -789,13 +772,7 @@
     }
 
     function applyFilterAndSort() {
-      const query = searchInput.value.trim().toLowerCase();
-      state.filteredRows = state.rows
-        .filter((row) => {
-          if (!query) return true;
-          return `${row.teamName} ${row.teamAbbrev} ${row.opponentName} ${row.opponentAbbrev} ${row.startingPitcher} ${row.opposingPitcher}`.toLowerCase().includes(query);
-        })
-        .sort(compareRows);
+      state.filteredRows = [...state.rows].sort(compareRows);
 
       updateHeaderState();
     }

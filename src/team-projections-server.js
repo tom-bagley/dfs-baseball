@@ -9,7 +9,6 @@ import {
   getDraftKingsSlates,
   getPlayerProjectionSlate,
   getProjectionSlate,
-  importDraftKingsSalaries,
   runCustomProjection,
 } from './projections-data.js';
 
@@ -41,11 +40,6 @@ const server = createServer(async (request, response) => {
 
     if (request.method === 'POST' && url.pathname === '/api/refresh-player-projections') {
       await handleRefreshPlayerProjections(request, response);
-      return;
-    }
-
-    if (request.method === 'POST' && url.pathname === '/api/import-draftkings-salaries') {
-      await handleImportDraftKingsSalaries(request, response);
       return;
     }
 
@@ -140,32 +134,6 @@ async function handleRefreshPlayerProjections(request, response) {
       error: formatError(error),
       phase: 'player-refresh',
       hint: 'The server is running, but an upstream FanGraphs request failed.',
-    });
-  }
-}
-
-async function handleImportDraftKingsSalaries(request, response) {
-  const body = await readJsonBody(request);
-  const date = String(body.date || '').trim();
-  const csvText = String(body.csvText || '');
-
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-    sendJson(response, 400, { error: 'Use a date in YYYY-MM-DD format.' });
-    return;
-  }
-
-  if (!csvText.trim()) {
-    sendJson(response, 400, { error: 'Choose a DraftKings salary CSV before importing.' });
-    return;
-  }
-
-  try {
-    const result = await importDraftKingsSalaries({ date, csvText });
-    sendJson(response, 200, result);
-  } catch (error) {
-    sendJson(response, 400, {
-      error: formatError(error),
-      phase: 'draftkings-import',
     });
   }
 }

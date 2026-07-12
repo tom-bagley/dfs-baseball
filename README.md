@@ -40,7 +40,7 @@ The viewer has Teams and Players pages. Pick a date and click `Refresh`; the ser
 
 Cached FanGraphs sims are written to `out/cache/` by default. Set `CACHE_DIR` to move that cache somewhere else.
 
-On the Players page, use the `DK Slate` dropdown to pull DraftKings salaries automatically: it lists that date's classic MLB slates (main, early, night, turbo) straight from the DraftKings lobby, and selecting one downloads the player pool and salaries for that slate. `DK CSV` remains as a manual fallback (for example for past dates, which DraftKings no longer serves). Either way, salaries are cached by date, joined to player projections on refresh, and shown as salary/value columns.
+On the Players page, use the `DK Slate` dropdown to pull DraftKings salaries automatically: it lists that date's classic MLB slates (main, early, night, turbo) straight from the DraftKings lobby, and selecting one downloads the player pool and salaries for that slate. Salaries are cached by date, joined to player projections on refresh, and shown in the player table.
 
 After a slate loads, use the `Custom` button on any row to edit that game's batting orders and starting pitchers. The editor starts with FanGraphs' current sim inputs, lets you swap player ids from the loaded sim player list, then sends a custom FanGraphs simulation request and replaces that game in the table with the custom result. Repeated custom payloads are cached under `fangraphs-custom-sims`.
 

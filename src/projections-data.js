@@ -215,33 +215,6 @@ export async function getPlayerProjectionSlate({
   };
 }
 
-export async function importDraftKingsSalaries({
-  date,
-  csvText,
-} = {}) {
-  validateDate(date);
-  const rows = parseDraftKingsSalaryCsv(csvText);
-  if (!rows.length) {
-    throw new Error('No DraftKings salary rows were found in that CSV.');
-  }
-
-  const payload = {
-    date,
-    source: 'DraftKings',
-    rows,
-    importedAt: new Date().toISOString(),
-  };
-  await writeCachedJson(draftKingsSalaryCachePath(date), payload);
-
-  return {
-    ok: true,
-    date,
-    source: 'DraftKings',
-    rows: rows.length,
-    importedAt: payload.importedAt,
-  };
-}
-
 export async function getDraftKingsSlates({ date } = {}) {
   validateDate(date);
 
@@ -747,6 +720,7 @@ function buildGamePlayerRows({ date, game, schedule, scores, simId, sim, project
     const opponentName = side.opponentInfo?.name || side.opponent?.name || side.opponentAbbrev;
     const teamId = side.teamInfo?.id ?? side.team?.id ?? '';
     const opponentId = side.opponentInfo?.id ?? side.opponent?.id ?? '';
+    const opposingStarter = getStartingPitcher(side.opponent);
     const lineupSource = side.team?.lineupSource || '';
     const isConfirmedLineup = String(lineupSource).toLowerCase() === 'confirmed';
 
@@ -761,6 +735,8 @@ function buildGamePlayerRows({ date, game, schedule, scores, simId, sim, project
         opponentId,
         opponent: opponentName,
         opponentAbbrev: side.opponentAbbrev,
+        opposingStartingPitcherId: opposingStarter.playerId || '',
+        opposingStartingPitcher: opposingStarter.name || '',
         lineupSlot: index + 1,
         lineupSource,
         confirmedLineup: isConfirmedLineup,
@@ -785,6 +761,8 @@ function buildGamePlayerRows({ date, game, schedule, scores, simId, sim, project
         opponentId,
         opponent: opponentName,
         opponentAbbrev: side.opponentAbbrev,
+        opposingStartingPitcherId: opposingStarter.playerId || '',
+        opposingStartingPitcher: opposingStarter.name || '',
         lineupSlot: '',
         lineupSource,
         confirmedLineup: false,
@@ -959,33 +937,6 @@ function indexDraftKingsSalaries(salaries) {
   return index;
 }
 
-function parseDraftKingsSalaryCsv(csvText) {
-  const table = parseCsv(csvText);
-  if (table.length < 2) return [];
-
-  const headers = table[0].map(normalizeHeader);
-  return table.slice(1)
-    .map((cells) => {
-      const row = rowFromCsvCells(headers, cells);
-      const name = cleanDraftKingsName(csvCell(row, ['name', 'nameandid']));
-      const teamAbbrev = normalizeTeam(csvCell(row, ['teamabbrev', 'team', 'teamabbr']));
-      const salary = parseSalary(csvCell(row, ['salary']));
-
-      return {
-        name,
-        normalizedName: normalizePlayerName(name),
-        id: csvCell(row, ['id', 'playerid']),
-        rosterPosition: csvCell(row, ['rosterposition']),
-        position: csvCell(row, ['position']),
-        salary,
-        gameInfo: csvCell(row, ['gameinfo', 'game']),
-        teamAbbrev,
-        avgPointsPerGame: parseNullableNumber(csvCell(row, ['avgpointspergame', 'fppg'])),
-      };
-    })
-    .filter((row) => row.name && row.teamAbbrev && typeof row.salary === 'number');
-}
-
 function buildDraftKingsSlateOption(group) {
   const startTimeEst = String(group?.StartDateEst || '');
   const suffix = String(group?.ContestStartTimeSuffix || '').trim();
@@ -1085,72 +1036,6 @@ function parseDraftKingsFppg(attributes, fppgStatId) {
   return parseNullableNumber(match?.value);
 }
 
-function parseCsv(text = '') {
-  const rows = [];
-  let row = [];
-  let cell = '';
-  let inQuotes = false;
-
-  for (let index = 0; index < String(text).length; index += 1) {
-    const char = text[index];
-    const next = text[index + 1];
-
-    if (char === '"') {
-      if (inQuotes && next === '"') {
-        cell += '"';
-        index += 1;
-      } else {
-        inQuotes = !inQuotes;
-      }
-      continue;
-    }
-
-    if (char === ',' && !inQuotes) {
-      row.push(cell);
-      cell = '';
-      continue;
-    }
-
-    if ((char === '\n' || char === '\r') && !inQuotes) {
-      if (char === '\r' && next === '\n') index += 1;
-      row.push(cell);
-      rows.push(row);
-      row = [];
-      cell = '';
-      continue;
-    }
-
-    cell += char;
-  }
-
-  if (cell || row.length) {
-    row.push(cell);
-    rows.push(row);
-  }
-
-  return rows.filter((cells) => cells.some((value) => String(value).trim()));
-}
-
-function rowFromCsvCells(headers, cells) {
-  const row = {};
-  headers.forEach((header, index) => {
-    row[header] = String(cells[index] ?? '').trim();
-  });
-  return row;
-}
-
-function csvCell(row, names) {
-  for (const name of names) {
-    const key = normalizeHeader(name);
-    if (row[key]) return row[key];
-  }
-  return '';
-}
-
-function normalizeHeader(value) {
-  return String(value || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-}
-
 function cleanDraftKingsName(value) {
   return String(value || '').replace(/\s+\(\d+\)\s*$/, '').trim();
 }
@@ -1168,11 +1053,6 @@ function normalizePlayerName(value) {
     .replace(/\b(jr|sr|ii|iii|iv|v)\b\.?/gi, '')
     .replace(/[^a-z0-9]/gi, '')
     .toLowerCase();
-}
-
-function parseSalary(value) {
-  const number = Number(String(value || '').replace(/[$,]/g, '').trim());
-  return Number.isFinite(number) && number > 0 ? number : null;
 }
 
 function parseNullableNumber(value) {

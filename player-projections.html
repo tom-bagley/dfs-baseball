@@ -44,9 +44,9 @@
 
     header {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) auto;
+      grid-template-columns: 1fr;
       align-items: end;
-      gap: 20px;
+      gap: 14px;
       margin-bottom: 18px;
     }
 
@@ -98,6 +98,19 @@
       gap: 10px;
     }
 
+    .controls {
+      flex-direction: column;
+      align-items: flex-start;
+      justify-content: flex-start;
+    }
+
+    .control-group {
+      display: flex;
+      flex-wrap: nowrap;
+      align-items: end;
+      gap: 10px;
+    }
+
     label {
       display: grid;
       gap: 6px;
@@ -125,7 +138,6 @@
 
     input[type="date"],
     input[type="number"],
-    input[type="search"],
     select {
       border: 1px solid var(--line);
       background: var(--panel);
@@ -241,6 +253,10 @@
       border-bottom: 1px solid var(--line);
     }
 
+    .player-table-controls {
+      grid-template-columns: 1fr;
+    }
+
     .status {
       color: var(--muted);
       font-size: 0.92rem;
@@ -249,10 +265,6 @@
     .status.error {
       color: var(--bad-text);
       font-weight: 700;
-    }
-
-    .search {
-      width: min(320px, 100%);
     }
 
     .game-filter {
@@ -479,7 +491,7 @@
 
     table {
       width: 100%;
-      min-width: 1380px;
+      min-width: 1050px;
       border-collapse: separate;
       border-spacing: 0;
     }
@@ -518,20 +530,23 @@
     }
 
     th[data-sort-key]::after {
-      content: "^v";
-      margin-left: 6px;
-      color: #94a0b1;
-      font-size: 0.75rem;
+      content: "";
+      display: inline-block;
+      color: var(--accent);
+      font-size: 0.78rem;
+      font-weight: 700;
+      line-height: 1;
+      transform: translateY(-1px);
     }
 
     th.active.asc::after {
-      content: "^";
-      color: var(--accent);
+      content: "↑";
+      margin-left: 7px;
     }
 
     th.active.desc::after {
-      content: "v";
-      color: var(--accent);
+      content: "↓";
+      margin-left: 7px;
     }
 
     tr:last-child td {
@@ -548,8 +563,20 @@
     }
 
     .player {
-      min-width: 180px;
+      width: 155px;
+      min-width: 155px;
+      max-width: 155px;
       font-weight: 800;
+    }
+
+    .team-abbrev-col {
+      width: 68px;
+      min-width: 68px;
+      max-width: 68px;
+    }
+
+    .team-abbrev-col .abbrev {
+      margin-right: 0;
     }
 
     .lineup-marker {
@@ -616,6 +643,7 @@
 
       .controls,
       .filters {
+        flex-wrap: wrap;
         justify-content: stretch;
       }
 
@@ -623,7 +651,6 @@
       .controls button,
       .filters > *,
       input[type="date"],
-      .search,
       .game-filter,
       .position-role-filter {
         width: 100%;
@@ -664,46 +691,45 @@
     <header>
       <div>
         <h1>MLB Player Projections</h1>
-        <p class="subhead">Refresh hitters and pitchers from the selected FanGraphs slate using cached sim lookups.</p>
       </div>
       <div class="controls" aria-label="Projection controls">
-        <label>
-          Date
-          <input id="dateInput" type="date">
-        </label>
-        <label title="Load DraftKings salaries automatically for one of the day's classic slates">
-          DK Slate
-          <select id="dkSlateSelect" class="slate-select" autocomplete="off">
-            <option value="">Loading slates...</option>
-          </select>
-        </label>
-        <label class="file-button" title="Import DraftKings salary CSV for the selected date (fallback if automatic slates are unavailable)">
-          DK CSV
-          <input id="dkFileInput" type="file" accept=".csv,text/csv">
-        </label>
-        <button id="refreshButton" class="primary" type="button" title="Refresh player projections for the selected date">
-          Refresh
-        </button>
-        <label>
-          Budget
-          <input id="budgetInput" class="budget-input" type="number" min="100" step="100" value="50000">
-        </label>
-        <label title="Minimum hitters from a single team, to build stacks (0 or 1 = no stacking)">
-          Stack
-          <input id="stackInput" class="stack-input" type="number" min="0" max="8" step="1" value="4">
-        </label>
-        <label title="Spread player exposure across the ten builds: limit how many players any two builds may share, or cap how many builds a single player can appear in">
-          Diversity
-          <select id="diversityInput">
-            <option value="off">Off (true top 10)</option>
-            <option value="overlap-6">Max 6 shared</option>
-            <option value="overlap-4">Max 4 shared</option>
-            <option value="cap-50">Player cap 50%</option>
-          </select>
-        </label>
-        <button id="maxPointsButton" type="button" class="file-button" title="Build the highest-scoring lineup (2 SP, 1 C, 1 1B, 1 2B, 1 3B, 1 SS, 3 OF) that fits the budget and stack requirement">
-          Max Points
-        </button>
+        <div class="control-group slate-controls">
+          <label>
+            Date
+            <input id="dateInput" type="date">
+          </label>
+          <label title="Load DraftKings salaries automatically for one of the day's classic slates">
+            DK Slate
+            <select id="dkSlateSelect" class="slate-select" autocomplete="off">
+              <option value="">Loading slates...</option>
+            </select>
+          </label>
+          <button id="refreshButton" class="primary" type="button" title="Refresh player projections for the selected date">
+            Refresh
+          </button>
+        </div>
+        <div class="control-group optimizer-controls">
+          <label>
+            Budget
+            <input id="budgetInput" class="budget-input" type="number" min="100" step="100" value="50000">
+          </label>
+          <label title="Minimum hitters from a single team, to build stacks (0 or 1 = no stacking)">
+            Stack
+            <input id="stackInput" class="stack-input" type="number" min="0" max="8" step="1" value="4">
+          </label>
+          <label title="Spread player exposure across the ten builds: limit how many players any two builds may share, or cap how many builds a single player can appear in">
+            Diversity
+            <select id="diversityInput">
+              <option value="off">Off (true top 10)</option>
+              <option value="overlap-6">Max 6 shared</option>
+              <option value="overlap-4">Max 4 shared</option>
+              <option value="cap-50">Player cap 50%</option>
+            </select>
+          </label>
+          <button id="maxPointsButton" type="button" class="file-button" title="Build the highest-scoring lineup (2 SP, 1 C, 1 1B, 1 2B, 1 3B, 1 SS, 3 OF) that fits the budget and stack requirement">
+            Max Points
+          </button>
+        </div>
       </div>
     </header>
 
@@ -753,10 +779,8 @@
     </section>
 
     <section class="table-shell">
-      <div class="table-top">
-        <div id="status" class="status">Choose a date and refresh player projections.</div>
+      <div class="table-top player-table-controls">
         <div class="filters">
-          <input id="searchInput" class="search" type="search" placeholder="Filter player, team, or opponent">
           <div id="gameFilter" class="game-filter">
             <button id="gameFilterButton" class="filter-menu-button" type="button" aria-haspopup="true" aria-expanded="false">
               All games
@@ -770,7 +794,7 @@
             </div>
           </div>
           <select id="positionRoleFilter" class="position-role-filter" aria-label="Position filter">
-            <option value="hitter">All hitters</option>
+            <option value="hitter">Position</option>
             <option value="pitcher">P</option>
           </select>
         </div>
@@ -779,33 +803,27 @@
         <table id="playerTable" data-view-type="hitter">
           <thead>
             <tr>
-              <th data-sort-key="displayTime">Time</th>
+              <th data-sort-key="gameTimeUtc">Time</th>
               <th data-sort-key="playerName">Player</th>
-              <th data-sort-key="teamAbbrev">Team</th>
-              <th data-sort-key="opponentAbbrev">Opp</th>
+              <th class="team-abbrev-col" data-sort-key="teamAbbrev">Team</th>
+              <th class="team-abbrev-col" data-sort-key="opponentAbbrev">Opp</th>
+              <th data-sort-key="opposingStartingPitcher">Opposing SP</th>
               <th class="num hitter-col" data-sort-key="lineupSlot">Slot</th>
               <th class="hitter-col" data-sort-key="position">Pos</th>
               <th class="pitcher-col" data-sort-key="role">Role</th>
               <th class="num" data-sort-key="expectedPoints">Expected</th>
               <th class="num" data-sort-key="dkSalary">DK Salary</th>
-              <th class="num" data-sort-key="dkValue">Value</th>
               <th class="num" data-sort-key="dkDollarsPerPoint">$/Pt</th>
               <th data-sort-key="dkRosterPosition">DK Pos</th>
-              <th class="num hitter-col" data-sort-key="hitterPoints">Hitter Pts</th>
               <th class="num pitcher-col" data-sort-key="pitcherPoints">Pitcher Pts</th>
-              <th class="num hitter-col" data-sort-key="homeRuns">HR</th>
-              <th class="num hitter-col" data-sort-key="runsBattedIn">RBI</th>
-              <th class="num hitter-col" data-sort-key="runs">R</th>
-              <th class="num hitter-col" data-sort-key="stolenBases">SB</th>
               <th class="num pitcher-col" data-sort-key="inningsPitched">IP</th>
               <th class="num pitcher-col" data-sort-key="strikeouts">K</th>
               <th class="num pitcher-col" data-sort-key="win">Win</th>
               <th class="num pitcher-col" data-sort-key="earnedRunsAllowed">ER</th>
-              <th data-sort-key="status">Status</th>
             </tr>
           </thead>
           <tbody id="tableBody">
-            <tr><td class="empty" colspan="17">No player projections loaded yet.</td></tr>
+            <tr><td class="empty" colspan="11">No player projections loaded yet.</td></tr>
           </tbody>
         </table>
       </div>
@@ -830,8 +848,6 @@
     const dateInput = document.querySelector("#dateInput");
     const refreshButton = document.querySelector("#refreshButton");
     const dkSlateSelect = document.querySelector("#dkSlateSelect");
-    const dkFileInput = document.querySelector("#dkFileInput");
-    const searchInput = document.querySelector("#searchInput");
     const gameFilter = document.querySelector("#gameFilter");
     const gameFilterButton = document.querySelector("#gameFilterButton");
     const gameFilterMenu = document.querySelector("#gameFilterMenu");
@@ -849,7 +865,6 @@
     const excludedShell = document.querySelector("#excludedShell");
     const excludedChips = document.querySelector("#excludedChips");
     const clearExcludedButton = document.querySelector("#clearExcludedButton");
-    const statusEl = document.querySelector("#status");
     const playerTable = document.querySelector("#playerTable");
     const tableBody = document.querySelector("#tableBody");
     const playersMetric = document.querySelector("#playersMetric");
@@ -899,17 +914,6 @@
     clearExcludedButton.addEventListener("click", () => {
       excludedPlayers.clear();
       onExclusionsChanged();
-    });
-
-    dkFileInput.addEventListener("change", () => {
-      const file = dkFileInput.files?.[0];
-      if (file) importDraftKingsCsv(file);
-      dkFileInput.value = "";
-    });
-
-    searchInput.addEventListener("input", () => {
-      applyFilterAndSort();
-      renderTable();
     });
 
     gameFilterButton.addEventListener("click", () => {
@@ -1026,7 +1030,7 @@
         renderDkSlateOptions(dkSlates.length ? "Select DK slate..." : "No DK slates for this date");
       } catch (error) {
         renderDkSlateOptions("DK slates unavailable");
-        setStatus(`Could not load DraftKings slates. ${formatError(error)} Use the DK CSV upload instead.`, true);
+        setStatus(`Could not load DraftKings slates. ${formatError(error)}`, true);
       }
     }
 
@@ -1080,54 +1084,14 @@
       return result;
     }
 
-    async function importDraftKingsCsv(file) {
-      const date = dateInput.value;
-      if (!date) {
-        setStatus("Pick a date before importing DraftKings salaries.", true);
-        return;
-      }
-
-      setBusy(true);
-      setStatus(`Importing DraftKings salaries from ${file.name}...`);
-
-      try {
-        const csvText = await file.text();
-        const result = await importDraftKingsRequest(date, csvText);
-        setStatus(`Imported ${result.rows} DraftKings salaries for ${date}. Refreshing table...`);
-        if (state.rows.length) {
-          await refreshPlayers(date);
-        } else {
-          setStatus(`Imported ${result.rows} DraftKings salaries for ${date}. Click Refresh to join them to projections.`);
-        }
-      } catch (error) {
-        setStatus(`Could not import DraftKings salaries. ${formatError(error)}`, true);
-      } finally {
-        setBusy(false);
-      }
-    }
-
-    async function importDraftKingsRequest(date, csvText) {
-      const response = await fetch(`${API_BASE}/api/import-draftkings-salaries`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ date, csvText }),
-      });
-      const result = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        throw new Error(result.error || `HTTP ${response.status}`);
-      }
-      return result;
-    }
-
     function applyPlayerRows(result) {
       const playerRows = Array.isArray(result.rows) ? result.rows : [];
 
       state.rows = playerRows;
       state.refreshedAt = result.refreshedAt || "";
       state.cache = result.cache || null;
-      searchInput.value = "";
       populateGameFilter(true);
-      const slateGameCount = restrictGamesToDkSlate();
+      restrictGamesToDkSlate();
       populatePositionRoleFilter(true);
       updateViewMode();
       applyFilterAndSort();
@@ -1139,10 +1103,6 @@
         return;
       }
 
-      const gameCount = new Set(playerRows.map((row) => row.gameKey || row.mlbGameId || row.gameId).filter(Boolean)).size;
-      const errorCount = playerRows.filter((row) => row.error).length;
-      const slateNote = slateGameCount ? ` Showing the ${slateGameCount} DK slate games.` : "";
-      setStatus(`Loaded ${playerRows.length} players from ${gameCount} games${errorCount ? `; ${errorCount} rows have notes` : ""}. ${cacheSummary(result.cache)}${slateNote}`);
     }
 
     // Roster: 2 SP plus 1 C, 1 1B, 1 2B, 1 3B, 1 SS, 3 OF.
@@ -1214,8 +1174,8 @@
         optimizerShell.hidden = true;
         setStatus(
           state.rows.length
-            ? "No players have DK salaries yet. Import a DK CSV, then refresh."
-            : "Refresh projections and import a DK CSV before calculating max points.",
+            ? "No players have DK salaries yet. Select a DK slate, then refresh."
+            : "Refresh projections and select a DK slate before calculating max points.",
           true,
         );
         return;
@@ -1819,7 +1779,6 @@
     }
 
     function applyFilterAndSort() {
-      const query = searchInput.value.trim().toLowerCase();
       const { type, positionOrRole } = selectedPositionFilter();
       const selectedGameKeys = state.selectedGameKeys;
       const hasGameOptions = availableGameKeys().length > 0;
@@ -1830,8 +1789,7 @@
           if (type === "pitcher" && !isRosterablePitcher(row)) return false;
           if (hasGameOptions && !selectedGameKeys.has(rowGameKey(row))) return false;
           if (positionOrRole && !rowPositionOrRoleValues(row).includes(positionOrRole)) return false;
-          if (!query) return true;
-          return `${row.playerName} ${row.team} ${row.teamAbbrev} ${row.opponent} ${row.opponentAbbrev} ${row.position} ${row.role} ${row.dkPosition} ${row.dkRosterPosition}`.toLowerCase().includes(query);
+          return true;
         })
         .sort(compareRows);
 
@@ -1883,27 +1841,21 @@
         <tr>
           <td>${escapeHtml(row.displayTime)}</td>
           <td class="player${row.playerName && excludedPlayers.has(lineupPlayerKey(row)) ? " excluded-player" : ""}">${escapeHtml(row.playerName || row.error || "--")}${confirmedLineupMarker(row)}${excludeToggleButton(row)}</td>
-          <td><span class="abbrev">${escapeHtml(row.teamAbbrev || "--")}</span>${escapeHtml(row.team || "")}</td>
-          <td>${escapeHtml(row.opponentAbbrev || row.opponent || "")}</td>
+          <td class="team-abbrev-col"><span class="abbrev">${escapeHtml(row.teamAbbrev || "--")}</span></td>
+          <td class="team-abbrev-col"><span class="abbrev">${escapeHtml(row.opponentAbbrev || "--")}</span></td>
+          <td>${escapeHtml(row.opposingStartingPitcher || "--")}</td>
           <td class="num hitter-col">${formatWhole(row.lineupSlot)}</td>
           <td class="hitter-col">${escapeHtml(row.position || "")}</td>
           <td class="pitcher-col">${escapeHtml(row.role || "")}</td>
           <td class="num">${formatNumber(row.expectedPoints, 2)}</td>
           <td class="num">${formatSalary(row.dkSalary)}</td>
-          <td class="num">${formatNumber(row.dkValue, 2)}</td>
           <td class="num">${formatMoneyPerPoint(row.dkDollarsPerPoint)}</td>
           <td>${escapeHtml(row.dkRosterPosition || row.dkPosition || "")}</td>
-          <td class="num hitter-col">${formatNumber(row.hitterPoints, 2)}</td>
           <td class="num pitcher-col">${formatNumber(row.pitcherPoints, 2)}</td>
-          <td class="num hitter-col">${formatNumber(row.homeRuns, 3)}</td>
-          <td class="num hitter-col">${formatNumber(row.runsBattedIn, 2)}</td>
-          <td class="num hitter-col">${formatNumber(row.runs, 2)}</td>
-          <td class="num hitter-col">${formatNumber(row.stolenBases, 3)}</td>
           <td class="num pitcher-col">${formatNumber(row.inningsPitched, 2)}</td>
           <td class="num pitcher-col">${formatNumber(row.strikeouts, 2)}</td>
           <td class="num pitcher-col">${formatNumber(row.win, 3)}</td>
           <td class="num pitcher-col">${formatNumber(row.earnedRunsAllowed, 2)}</td>
-          <td>${escapeHtml(row.status || row.error || "")}</td>
         </tr>
       `).join("");
     }
@@ -1918,8 +1870,7 @@
     }
 
     function setStatus(message, isError = false) {
-      statusEl.textContent = message;
-      statusEl.classList.toggle("error", isError);
+      if (isError) console.error(message);
     }
 
     function setBusy(isBusy) {
@@ -1929,7 +1880,7 @@
 
     function defaultDirection(key) {
       if (key === "dkDollarsPerPoint") return "asc";
-      return ["displayTime", "playerName", "teamAbbrev", "opponentAbbrev", "position", "role", "dkRosterPosition", "status"].includes(key) ? "asc" : "desc";
+      return ["gameTimeUtc", "playerName", "teamAbbrev", "opponentAbbrev", "opposingStartingPitcher", "position", "role", "dkRosterPosition"].includes(key) ? "asc" : "desc";
     }
 
     function compactPlayerMetric(row) {
@@ -1996,16 +1947,19 @@
       for (const row of state.rows) {
         const key = rowGameKey(row);
         if (!key || games.has(key)) continue;
-        games.set(key, gameLabel(row));
+        games.set(key, {
+          label: gameLabel(row),
+          gameTime: row.gameTimeUtc || row.gameTimeLocal || "",
+        });
       }
 
       gameFilterOptions.innerHTML = [
         ...[...games.entries()]
-          .sort((a, b) => a[1].localeCompare(b[1], undefined, { numeric: true }))
-          .map(([key, label]) => `
+          .sort((a, b) => a[1].gameTime.localeCompare(b[1].gameTime) || a[1].label.localeCompare(b[1].label))
+          .map(([key, game]) => `
             <label class="filter-check">
               <input type="checkbox" value="${escapeHtml(key)}">
-              <span>${escapeHtml(label)}</span>
+              <span>${escapeHtml(game.label)}</span>
             </label>
           `),
       ].join("");
@@ -2082,7 +2036,7 @@
         .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
 
       positionRoleFilter.innerHTML = [
-        `<option value="hitter">All hitters</option>`,
+        `<option value="hitter">Position</option>`,
         ...hitterValues.map((value) => `<option value="hitter:${escapeHtml(value)}">${escapeHtml(value)}</option>`),
         `<option value="pitcher">P</option>`,
       ].join("");
@@ -2103,14 +2057,14 @@
     }
 
     function visibleSortKeys() {
-      const common = ["displayTime", "playerName", "teamAbbrev", "opponentAbbrev", "expectedPoints", "dkSalary", "dkValue", "dkDollarsPerPoint", "dkRosterPosition", "status"];
-      const hitter = ["lineupSlot", "position", "hitterPoints", "homeRuns", "runsBattedIn", "runs", "stolenBases"];
+      const common = ["gameTimeUtc", "playerName", "teamAbbrev", "opponentAbbrev", "opposingStartingPitcher", "expectedPoints", "dkSalary", "dkDollarsPerPoint", "dkRosterPosition"];
+      const hitter = ["lineupSlot", "position"];
       const pitcher = ["role", "pitcherPoints", "inningsPitched", "strikeouts", "win", "earnedRunsAllowed"];
       return new Set([...common, ...(selectedPositionFilter().type === "pitcher" ? pitcher : hitter)]);
     }
 
     function visibleColumnCount() {
-      return selectedPositionFilter().type === "pitcher" ? 16 : 17;
+      return selectedPositionFilter().type === "pitcher" ? 15 : 11;
     }
 
     function rowGameKey(row) {

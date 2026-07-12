@@ -214,7 +214,7 @@
     }
 
     .table-top {
-      display: grid;
+      display: none;
       grid-template-columns: minmax(0, 1fr) auto;
       align-items: center;
       gap: 12px;
@@ -238,12 +238,12 @@
 
     .table-wrap {
       overflow: auto;
-      max-height: calc(100vh - 285px);
+      max-height: calc(100vh - 225px);
     }
 
     table {
       width: 100%;
-      min-width: 1440px;
+      min-width: 1320px;
       border-collapse: separate;
       border-spacing: 0;
     }
@@ -277,20 +277,23 @@
     }
 
     th[data-sort-key]::after {
-      content: "^v";
-      margin-left: 6px;
-      color: #94a0b1;
-      font-size: 0.75rem;
+      content: "";
+      display: inline-block;
+      color: var(--accent);
+      font-size: 0.78rem;
+      font-weight: 700;
+      line-height: 1;
+      transform: translateY(-1px);
     }
 
     th.active.asc::after {
-      content: "^";
-      color: var(--accent);
+      content: "↑";
+      margin-left: 7px;
     }
 
     th.active.desc::after {
-      content: "v";
-      color: var(--accent);
+      content: "↓";
+      margin-left: 7px;
     }
 
     tr:last-child td {
@@ -301,14 +304,32 @@
       background: #fbfcfe;
     }
 
+    tr.roi-highlight td {
+      background: #f1faf4;
+    }
+
+    tr.roi-highlight td:first-child {
+      box-shadow: inset 3px 0 0 #43a66b;
+    }
+
+    tr.roi-highlight:hover td {
+      background: #e8f6ed;
+    }
+
     .num {
       text-align: right;
       font-variant-numeric: tabular-nums;
     }
 
     .team {
-      min-width: 190px;
+      width: 68px;
+      min-width: 68px;
+      max-width: 68px;
       font-weight: 800;
+    }
+
+    .team .abbrev {
+      margin-right: 0;
     }
 
     .abbrev {
@@ -556,7 +577,6 @@
     <header>
       <div>
         <h1>MLB Team Projections</h1>
-        <p class="subhead">Refresh the selected slate from FanGraphs and ESPN with cached sim lookups.</p>
       </div>
       <div class="controls" aria-label="Projection controls">
         <label>
@@ -592,8 +612,8 @@
         <strong id="runsMetric">--</strong>
       </div>
       <div class="metric">
-        <span>Best Edge</span>
-        <strong id="favoriteMetric">--</strong>
+        <span>Top ROI</span>
+        <strong id="topRoiMetric">--</strong>
       </div>
     </section>
 
@@ -610,15 +630,13 @@
               <th data-sort-key="teamName">Team</th>
               <th data-sort-key="side">Side</th>
               <th data-sort-key="lineupSource">Lineup</th>
-              <th data-sort-key="startingPitcher">Starter</th>
               <th data-sort-key="opponentName">Opponent</th>
+              <th data-sort-key="startingPitcher">Starter</th>
+              <th data-sort-key="opposingPitcher">Opposing Pitcher</th>
+              <th class="num" data-sort-key="expectedRoi">ROI</th>
               <th class="num" data-sort-key="projectedRuns">Proj Runs</th>
-              <th class="num" data-sort-key="winPct">Win %</th>
               <th class="num" data-sort-key="moneyline">FG Fair ML</th>
               <th class="num" data-sort-key="marketMoneyline">ESPN ML</th>
-              <th class="num" data-sort-key="marketImpliedPct">Market %</th>
-              <th class="num" data-sort-key="edgePct">Edge</th>
-              <th class="num" data-sort-key="expectedRoi">ROI</th>
               <th class="num" data-sort-key="projectedTotalRuns">Game Total</th>
               <th data-sort-key="oddsProvider">Provider</th>
               <th data-sort-key="projectionSystem">Projection</th>
@@ -627,7 +645,7 @@
             </tr>
           </thead>
           <tbody id="tableBody">
-            <tr><td class="empty" colspan="18">No projections loaded yet.</td></tr>
+            <tr><td class="empty" colspan="16">No projections loaded yet.</td></tr>
           </tbody>
         </table>
       </div>
@@ -652,7 +670,7 @@
     const state = {
       rows: [],
       filteredRows: [],
-      sortKey: "projectedRuns",
+      sortKey: "expectedRoi",
       sortDirection: "desc",
       refreshedAt: "",
       cache: null,
@@ -673,7 +691,7 @@
     const teamsMetric = document.querySelector("#teamsMetric");
     const gamesMetric = document.querySelector("#gamesMetric");
     const runsMetric = document.querySelector("#runsMetric");
-    const favoriteMetric = document.querySelector("#favoriteMetric");
+    const topRoiMetric = document.querySelector("#topRoiMetric");
     const headers = [...document.querySelectorAll("th[data-sort-key]")];
     const customOverlay = document.querySelector("#customOverlay");
     const customTitle = document.querySelector("#customTitle");
@@ -775,7 +793,7 @@
       state.filteredRows = state.rows
         .filter((row) => {
           if (!query) return true;
-          return `${row.teamName} ${row.teamAbbrev} ${row.opponentName} ${row.opponentAbbrev} ${row.startingPitcher}`.toLowerCase().includes(query);
+          return `${row.teamName} ${row.teamAbbrev} ${row.opponentName} ${row.opponentAbbrev} ${row.startingPitcher} ${row.opposingPitcher}`.toLowerCase().includes(query);
         })
         .sort(compareRows);
 
@@ -802,25 +820,23 @@
 
     function renderTable() {
       if (!state.filteredRows.length) {
-        tableBody.innerHTML = `<tr><td class="empty" colspan="18">${state.rows.length ? "No teams match that filter." : "No projections loaded yet."}</td></tr>`;
+        tableBody.innerHTML = `<tr><td class="empty" colspan="16">${state.rows.length ? "No teams match that filter." : "No projections loaded yet."}</td></tr>`;
         return;
       }
 
       tableBody.innerHTML = state.filteredRows.map((row) => `
-        <tr>
+        <tr class="${typeof row.expectedRoi === "number" && row.expectedRoi > 0.05 ? "roi-highlight" : ""}">
           <td>${escapeHtml(row.displayTime)}</td>
-          <td class="team"><span class="abbrev">${escapeHtml(row.teamAbbrev || "--")}</span>${escapeHtml(row.teamName)}</td>
+          <td class="team"><span class="abbrev">${escapeHtml(row.teamAbbrev || "--")}</span></td>
           <td><span class="chip ${row.side === "Home" ? "home" : "away"}">${row.side}</span></td>
           <td><span class="chip ${lineupClass(row.lineupSource)}">${formatLineupSource(row.lineupSource)}</span></td>
+          <td><span class="abbrev">${escapeHtml(row.opponentAbbrev || "--")}</span></td>
           <td>${escapeHtml(row.startingPitcher || "--")}</td>
-          <td>${escapeHtml(row.opponentName)}</td>
+          <td>${escapeHtml(row.opposingPitcher || "--")}</td>
+          <td class="num">${formatSignedPct(row.expectedRoi)}</td>
           <td class="num">${formatNumber(row.projectedRuns, 2)}</td>
-          <td class="num">${formatPct(row.winPct)}</td>
           <td class="num"><span class="chip ${moneylineClass(row.moneyline)}">${formatMoneyline(row.moneyline)}</span></td>
           <td class="num"><span class="chip ${moneylineClass(row.marketMoneyline)}">${formatMoneyline(row.marketMoneyline)}</span></td>
-          <td class="num">${formatPct(row.marketImpliedPct)}</td>
-          <td class="num"><span class="chip ${edgeClass(row.edgePct)}">${formatSignedPct(row.edgePct)}</span></td>
-          <td class="num">${formatSignedPct(row.expectedRoi)}</td>
           <td class="num">${formatNumber(row.projectedTotalRuns, 2)}</td>
           <td>${escapeHtml(row.oddsProvider || row.oddsError || "")}</td>
           <td>${escapeHtml(row.projectionSystem)}</td>
@@ -834,7 +850,7 @@
       });
     }
 
-    function openCustomEditor(gameKey) {
+    async function openCustomEditor(gameKey) {
       const game = state.gamesByKey.get(String(gameKey));
       if (!game?.customInput) {
         setStatus("Custom inputs are unavailable for that game until the FanGraphs sim loads.", true);
@@ -843,9 +859,31 @@
 
       state.activeCustomGame = clone(game.customInput);
       customTitle.textContent = `${state.activeCustomGame.awayTeamAbbrev} @ ${state.activeCustomGame.homeTeamAbbrev}`;
-      renderCustomEditor();
       customOverlay.classList.add("open");
       customOverlay.setAttribute("aria-hidden", "false");
+      customBody.innerHTML = `<div class="empty">Loading active rosters...</div>`;
+      customRunButton.disabled = true;
+
+      try {
+        const [awayRoster, homeRoster] = await Promise.all([
+          teamRosterRequest(state.activeCustomGame.awayTeamAbbrev),
+          teamRosterRequest(state.activeCustomGame.homeTeamAbbrev),
+        ]);
+        if (!state.activeCustomGame) return;
+        state.activeCustomGame.rosters = { away: awayRoster, home: homeRoster };
+        renderCustomEditor();
+        customRunButton.disabled = false;
+      } catch (error) {
+        customBody.innerHTML = `<div class="empty">Could not load active rosters. ${escapeHtml(formatError(error))}</div>`;
+        setStatus(`Could not load active rosters. ${formatError(error)}`, true);
+      }
+    }
+
+    async function teamRosterRequest(teamAbbrev) {
+      const response = await fetch(`${API_BASE}/api/team-roster?team=${encodeURIComponent(teamAbbrev)}`);
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || `HTTP ${response.status}`);
+      return result;
     }
 
     function closeCustomEditor() {
@@ -860,7 +898,6 @@
       if (!game) return;
 
       customBody.innerHTML = `
-        ${playerDatalist(game)}
         ${customSideHtml("away", game)}
         ${customSideHtml("home", game)}
       `;
@@ -871,6 +908,7 @@
       const teamName = side === "away" ? game.awayTeamName : game.homeTeamName;
       const teamAbbrev = side === "away" ? game.awayTeamAbbrev : game.homeTeamAbbrev;
       const battingOrder = padBattingOrder(lineup.battingOrder || []);
+      const roster = game.rosters?.[side] || { batters: [], pitchers: [] };
 
       return `
         <section class="custom-side" data-side="${side}">
@@ -879,38 +917,28 @@
           ${battingOrder.map((slot, index) => `
             <label class="custom-row">
               <strong>${index + 1}. ${escapeHtml(slot.position || "")}</strong>
-              <input class="custom-input" data-custom-field="batter" data-side="${side}" data-index="${index}" list="customBatters" value="${escapeHtml(playerDisplayValue(slot))}" placeholder="Player name">
+              <select class="custom-input" data-custom-field="batter" data-side="${side}" data-index="${index}">
+                ${rosterOptions(roster.batters, slot.playerId, "Select active player")}
+              </select>
             </label>
           `).join("")}
           <div class="custom-section-label">Starter</div>
           <label class="custom-row">
             <strong>SP</strong>
-            <input class="custom-input" data-custom-field="starter" data-side="${side}" list="customPitchers" value="${escapeHtml(playerDisplayValue({ playerId: lineup.startingPitcher, name: lineup.startingPitcherName }))}" placeholder="Pitcher name">
+            <select class="custom-input" data-custom-field="starter" data-side="${side}">
+              ${rosterOptions(roster.pitchers, lineup.startingPitcher, "Select active pitcher")}
+            </select>
           </label>
         </section>
       `;
     }
 
-    function playerDatalist(game) {
-      return `
-        <datalist id="customBatters">${playerOptions(game.players?.batters || [])}</datalist>
-        <datalist id="customPitchers">${playerOptions(game.players?.pitchers || [])}</datalist>
-      `;
-    }
-
-    function playerOptions(players) {
-      const seen = new Set();
-      return players
-        .filter((player) => {
-          if (!player.playerId || seen.has(player.playerId)) return false;
-          seen.add(player.playerId);
-          return true;
-        })
+    function rosterOptions(players, selectedId, placeholder) {
+      return `<option value="">${escapeHtml(placeholder)}</option>` + players
         .sort((a, b) => String(a.name).localeCompare(String(b.name)))
         .map((player) => {
-          const value = playerDisplayValue(player);
-          const label = [player.team, player.position || player.role, player.playerId].filter(Boolean).join(" - ");
-          return `<option value="${escapeHtml(value)}" label="${escapeHtml(label)}"></option>`;
+          const selected = String(player.playerId) === String(selectedId) ? " selected" : "";
+          return `<option value="${escapeHtml(player.playerId)}"${selected}>${escapeHtml(player.name)} (${escapeHtml(player.position)})</option>`;
         })
         .join("");
     }
@@ -923,6 +951,7 @@
         customRunButton.disabled = true;
         customRunButton.textContent = "Running...";
         readCustomEditorIntoGame(game);
+        validateCustomLineups(game);
         const payload = buildCustomPayload(game);
         const result = await customProjectionRequest(game, payload);
         applyCustomProjectionRows(result);
@@ -941,15 +970,25 @@
         const index = Number(input.dataset.index);
         const lineup = game[side];
         if (!lineup?.battingOrder?.[index]) return;
-        lineup.battingOrder[index].playerId = resolvePlayerId(input.value, game);
+        lineup.battingOrder[index].playerId = input.value;
       });
 
       customBody.querySelectorAll("[data-custom-field='starter']").forEach((input) => {
         const side = input.dataset.side;
         const lineup = game[side];
         if (!lineup) return;
-        lineup.startingPitcher = resolvePlayerId(input.value, game);
+        lineup.startingPitcher = input.value;
       });
+    }
+
+    function validateCustomLineups(game) {
+      for (const side of ["away", "home"]) {
+        const team = side === "away" ? game.awayTeamAbbrev : game.homeTeamAbbrev;
+        const ids = padBattingOrder(game[side]?.battingOrder || []).map((slot) => slot.playerId).filter(Boolean);
+        if (ids.length !== 9) throw new Error(`${team} needs nine hitters.`);
+        if (new Set(ids).size !== 9) throw new Error(`${team} cannot use the same hitter twice.`);
+        if (!game[side]?.startingPitcher) throw new Error(`${team} needs a starting pitcher.`);
+      }
     }
 
     function buildCustomPayload(game) {
@@ -1064,14 +1103,14 @@
       const teams = state.rows.length;
       const gameCount = new Set(state.rows.map((row) => row.gameKey)).size;
       const topRuns = [...state.rows].sort((a, b) => (b.projectedRuns ?? -Infinity) - (a.projectedRuns ?? -Infinity))[0];
-      const bestEdge = state.rows
-        .filter((row) => typeof row.edgePct === "number")
-        .sort((a, b) => b.edgePct - a.edgePct)[0];
+      const topRoi = state.rows
+        .filter((row) => typeof row.expectedRoi === "number")
+        .sort((a, b) => b.expectedRoi - a.expectedRoi)[0];
 
       teamsMetric.textContent = String(teams);
       gamesMetric.textContent = String(gameCount);
       runsMetric.textContent = topRuns ? `${topRuns.teamAbbrev || topRuns.teamName} ${formatNumber(topRuns.projectedRuns, 2)}` : "--";
-      favoriteMetric.textContent = bestEdge ? `${bestEdge.teamAbbrev || bestEdge.teamName} ${formatSignedPct(bestEdge.edgePct)}` : "--";
+      topRoiMetric.textContent = topRoi ? `${topRoi.teamAbbrev || topRoi.teamName} ${formatSignedPct(topRoi.expectedRoi)}` : "--";
     }
 
     function updateHeaderState() {

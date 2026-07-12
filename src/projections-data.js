@@ -18,6 +18,16 @@ const DK_DRAFTABLES_BASE_URL = 'https://api.draftkings.com/draftgroups/v1/draftg
 // MLB Classic (2 P, C, 1B, 2B, 3B, SS, 3 OF) — the format the lineup optimizer builds.
 const DK_CLASSIC_CONTEST_TYPE_ID = 28;
 const DK_FPPG_STAT_ID = 408;
+const FANGRAPHS_TEAM_SLUGS = new Map([
+  ['ARI', 'diamondbacks'], ['ATH', 'athletics'], ['ATL', 'braves'], ['BAL', 'orioles'],
+  ['BOS', 'red-sox'], ['CHC', 'cubs'], ['CHW', 'white-sox'], ['CIN', 'reds'],
+  ['CLE', 'guardians'], ['COL', 'rockies'], ['DET', 'tigers'], ['HOU', 'astros'],
+  ['KCR', 'royals'], ['LAA', 'angels'], ['LAD', 'dodgers'], ['MIA', 'marlins'],
+  ['MIL', 'brewers'], ['MIN', 'twins'], ['NYM', 'mets'], ['NYY', 'yankees'],
+  ['PHI', 'phillies'], ['PIT', 'pirates'], ['SDP', 'padres'], ['SEA', 'mariners'],
+  ['SFG', 'giants'], ['STL', 'cardinals'], ['TBR', 'rays'], ['TEX', 'rangers'],
+  ['TOR', 'blue-jays'], ['WSN', 'nationals'],
+]);
 const DK_ROSTER_SLOT_NAMES = new Map([
   [110, 'P'],
   [111, 'C'],
@@ -252,6 +262,73 @@ export async function getDraftKingsSlates({ date } = {}) {
     slates,
     fetchedAt: new Date().toISOString(),
   };
+}
+
+export async function getActiveTeamRoster({ teamAbbrev } = {}) {
+  const team = normalizeTeam(teamAbbrev);
+  const slug = FANGRAPHS_TEAM_SLUGS.get(team);
+  if (!slug) throw new Error(`Unknown MLB team abbreviation: ${teamAbbrev}`);
+
+  const url = new URL(`/roster-resource/depth-charts/${slug}`, FANGRAPHS_BASE_URL);
+  const response = await fetch(url, {
+    headers: {
+      accept: 'text/html,application/xhtml+xml',
+      'user-agent': 'dfs-baseball-projections/1.0',
+    },
+  });
+  if (!response.ok) throw new Error(`FanGraphs roster request failed (${response.status}) for ${team}.`);
+
+  const players = parseActiveRosterHtml(await response.text(), team);
+  if (!players.length) throw new Error(`No active-roster players were found for ${team}.`);
+
+  return {
+    ok: true,
+    teamAbbrev: team,
+    batters: players.filter((player) => player.type === 'batter'),
+    pitchers: players.filter((player) => player.type === 'pitcher'),
+    fetchedAt: new Date().toISOString(),
+  };
+}
+
+function parseActiveRosterHtml(html, team) {
+  const start = html.search(/<h2[^>]*section-large[^>]*>\s*Active Roster/i);
+  if (start < 0) return [];
+  const remainder = html.slice(start + 1);
+  const nextSection = remainder.search(/<h2[^>]*section-large[^>]*>/i);
+  const section = nextSection < 0 ? remainder : remainder.slice(0, nextSection);
+  const rows = section.match(/<tr\b[\s\S]*?<\/tr>/gi) || [];
+  const seen = new Set();
+  const players = [];
+
+  for (const row of rows) {
+    const status = row.match(/<td[^>]*data-status="([^"]+)"[^>]*data-stat="STATUS"/i)?.[1] || '';
+    if (/IL|RL|BL|PL|FE|SUSP/i.test(status)) continue;
+    const positionMatch = row.match(/<td[^>]*data-col-id="position"[^>]*>([\s\S]*?)<\/td>/i);
+    const playerMatch = row.match(/<td[^>]*data-stat="PLAYER"[^>]*>[\s\S]*?<a[^>]*href="\/players\/[^"/]+\/(\d+)\/stats\/(?:batting|pitching)"[^>]*>([\s\S]*?)<\/a>/i);
+    if (!positionMatch || !playerMatch || seen.has(playerMatch[1])) continue;
+    const position = stripHtml(positionMatch[1]).toUpperCase();
+    const type = /^(?:SP|RP|P)$/.test(position) ? 'pitcher' : 'batter';
+    seen.add(playerMatch[1]);
+    players.push({
+      playerId: playerMatch[1],
+      name: stripHtml(playerMatch[2]),
+      position,
+      type,
+      team,
+    });
+  }
+
+  return players.sort((a, b) => a.type.localeCompare(b.type) || a.name.localeCompare(b.name));
+}
+
+function stripHtml(value) {
+  return String(value || '')
+    .replace(/<[^>]*>/g, '')
+    .replace(/&amp;/g, '&')
+    .replace(/&#x27;|&#39;/g, "'")
+    .replace(/&quot;/g, '"')
+    .replace(/&nbsp;/g, ' ')
+    .trim();
 }
 
 export async function fetchDraftKingsSalaries({ date, draftGroupId } = {}) {
@@ -1175,6 +1252,8 @@ function gameToTeamRows(game) {
       startingPitcher: game.awayStartingPitcher || '',
       opponentName: game.homeTeam || game.homeTeamAbbrev || '',
       opponentAbbrev: game.homeTeamAbbrev || '',
+      opposingPitcherId: game.homeStartingPitcherId || '',
+      opposingPitcher: game.homeStartingPitcher || '',
       projectedRuns: numberOrNull(game.awayProjectedRuns),
       winPct: numberOrNull(game.awayWinPct),
       moneyline: numberOrNull(game.awayMoneyline),
@@ -1189,6 +1268,8 @@ function gameToTeamRows(game) {
       startingPitcher: game.homeStartingPitcher || '',
       opponentName: game.awayTeam || game.awayTeamAbbrev || '',
       opponentAbbrev: game.awayTeamAbbrev || '',
+      opposingPitcherId: game.awayStartingPitcherId || '',
+      opposingPitcher: game.awayStartingPitcher || '',
       projectedRuns: numberOrNull(game.homeProjectedRuns),
       winPct: numberOrNull(game.homeWinPct),
       moneyline: numberOrNull(game.homeMoneyline),

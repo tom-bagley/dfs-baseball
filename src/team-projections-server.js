@@ -5,6 +5,7 @@ import { extname, normalize, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   fetchDraftKingsSalaries,
+  getActiveTeamRoster,
   getDraftKingsSlates,
   getPlayerProjectionSlate,
   getProjectionSlate,
@@ -50,6 +51,11 @@ const server = createServer(async (request, response) => {
 
     if (request.method === 'GET' && url.pathname === '/api/draftkings-slates') {
       await handleDraftKingsSlates(url, response);
+      return;
+    }
+
+    if (request.method === 'GET' && url.pathname === '/api/team-roster') {
+      await handleTeamRoster(url, response);
       return;
     }
 
@@ -181,6 +187,20 @@ async function handleDraftKingsSlates(url, response) {
       phase: 'draftkings-slates',
       hint: 'The server is running, but the DraftKings lobby request failed.',
     });
+  }
+}
+
+async function handleTeamRoster(url, response) {
+  const teamAbbrev = String(url.searchParams.get('team') || '').trim();
+  if (!teamAbbrev) {
+    sendJson(response, 400, { error: 'Choose a team first.' });
+    return;
+  }
+
+  try {
+    sendJson(response, 200, await getActiveTeamRoster({ teamAbbrev }));
+  } catch (error) {
+    sendJson(response, 502, { error: formatError(error), phase: 'team-roster' });
   }
 }
 

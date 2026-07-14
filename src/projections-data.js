@@ -3,6 +3,8 @@ import { existsSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
+import { simulatePitcherOutcomes } from './pitcher-outcome-sim.js';
+import { simulateHitterOutcomes } from './hitter-outcome-sim.js';
 
 const ROOT = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const CACHE_ROOT = resolve(process.env.CACHE_DIR || join(ROOT, 'out', 'cache'));
@@ -10,6 +12,7 @@ const FANGRAPHS_BASE_URL = 'https://www.fangraphs.com';
 const SIM_BASE_URL = `${FANGRAPHS_BASE_URL}/api-baseball-sim/Simulation`;
 const ESPN_SCOREBOARD_URL = 'https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/scoreboard';
 const ESPN_CORE_BASE_URL = 'https://sports.core.api.espn.com/v2/sports/baseball/leagues/mlb';
+const MLB_STATS_BASE_URL = 'https://statsapi.mlb.com/api/v1';
 const DEFAULT_PROJECTION_SYSTEM = 'rSteamer';
 const DEFAULT_LINE_TYPE = 'current';
 const DISPLAY_TIME_ZONE = 'America/Chicago';
@@ -147,8 +150,27 @@ export async function getPlayerProjectionSlate({
     simsMiss: 0,
   };
 
-  const games = await fetchFangraphsGames(date);
+  let games;
+  try {
+    games = await fetchFangraphsGames(date);
+  } catch (error) {
+    const rows = await fetchMlbProbablePitcherRows(date, projectionSystem);
+    return {
+      ok: true,
+      date,
+      projectionSystem,
+      rows,
+      cache: {
+        ...cacheStats,
+        schedule: 'mlb-probable-pitcher-fallback',
+        warning: `FanGraphs projections unavailable: ${formatError(error)}`,
+        probablePitchers: rows.length,
+      },
+      refreshedAt: new Date().toISOString(),
+    };
+  }
   const rows = [];
+  const pitcherSimulationInputs = new Map();
 
   for (const game of games) {
     const schedule = game.schedule || {};
@@ -168,7 +190,16 @@ export async function getPlayerProjectionSlate({
         cacheStats.simsMiss += 1;
       }
 
-      rows.push(...buildGamePlayerRows({ date, game, schedule, scores, simId, sim, projectionSystem }));
+      rows.push(...buildGamePlayerRows({
+        date,
+        game,
+        schedule,
+        scores,
+        simId,
+        sim,
+        projectionSystem,
+        pitcherSimulationInputs,
+      }));
     } catch (error) {
       rows.push({
         date,
@@ -189,6 +220,15 @@ export async function getPlayerProjectionSlate({
         error: formatError(error),
       });
     }
+  }
+
+  try {
+    const experienceStats = await applyPitcherExperienceAdjustments({ date, rows, pitcherSimulationInputs });
+    cacheStats.pitcherExperience = experienceStats.status;
+    cacheStats.pitcherExperienceMatched = experienceStats.matched;
+  } catch (error) {
+    cacheStats.pitcherExperience = 'unavailable';
+    cacheStats.pitcherExperienceError = formatError(error);
   }
 
   const draftKings = await loadDraftKingsSalaries(date);
@@ -677,7 +717,7 @@ function playersFromSim(sim = {}) {
   };
 }
 
-function buildGamePlayerRows({ date, game, schedule, scores, simId, sim, projectionSystem }) {
+function buildGamePlayerRows({ date, game, schedule, scores, simId, sim, projectionSystem, pitcherSimulationInputs = null }) {
   const context = {
     date,
     gameId: schedule.GameId ?? game.GameId ?? '',
@@ -699,18 +739,22 @@ function buildGamePlayerRows({ date, game, schedule, scores, simId, sim, project
       team: sim?.away,
       teamInfo: sim?.awayTeam,
       teamAbbrev: schedule.AwayTeamAbbName || '',
+      teamExpectedRuns: getAverageRuns(sim?.away),
       opponent: sim?.home,
       opponentInfo: sim?.homeTeam,
       opponentAbbrev: schedule.HomeTeamAbbName || '',
+      opponentExpectedRuns: getAverageRuns(sim?.home),
     },
     {
       side: 'home',
       team: sim?.home,
       teamInfo: sim?.homeTeam,
       teamAbbrev: schedule.HomeTeamAbbName || '',
+      teamExpectedRuns: getAverageRuns(sim?.home),
       opponent: sim?.away,
       opponentInfo: sim?.awayTeam,
       opponentAbbrev: schedule.AwayTeamAbbName || '',
+      opponentExpectedRuns: getAverageRuns(sim?.away),
     },
   ];
 
@@ -732,9 +776,11 @@ function buildGamePlayerRows({ date, game, schedule, scores, simId, sim, project
         teamId,
         team: teamName,
         teamAbbrev: side.teamAbbrev,
+        teamExpectedRuns: side.teamExpectedRuns,
         opponentId,
         opponent: opponentName,
         opponentAbbrev: side.opponentAbbrev,
+        opponentExpectedRuns: side.opponentExpectedRuns,
         opposingStartingPitcherId: opposingStarter.playerId || '',
         opposingStartingPitcher: opposingStarter.name || '',
         lineupSlot: index + 1,
@@ -745,12 +791,23 @@ function buildGamePlayerRows({ date, game, schedule, scores, simId, sim, project
         position: player.position || '',
         role: '',
         ...blankPitchingStats(),
-        ...hitterStats(player.average),
+        ...hitterStats(player.average, player.histograms, {
+          playerId: player.playerId,
+          date,
+        }),
         error: '',
       });
     });
 
     (side.team?.pitchers || []).forEach((player) => {
+      if (pitcherSimulationInputs && isStartingPitcherRole(player.role)) {
+        pitcherSimulationInputs.set(pitcherSimulationKey(player.playerId, player.name), {
+          playerId: player.playerId,
+          playerName: player.name || '',
+          average: player.average || {},
+          histograms: player.histograms || {},
+        });
+      }
       rows.push({
         ...context,
         playerType: 'pitcher',
@@ -758,9 +815,11 @@ function buildGamePlayerRows({ date, game, schedule, scores, simId, sim, project
         teamId,
         team: teamName,
         teamAbbrev: side.teamAbbrev,
+        teamExpectedRuns: side.teamExpectedRuns,
         opponentId,
         opponent: opponentName,
         opponentAbbrev: side.opponentAbbrev,
+        opponentExpectedRuns: side.opponentExpectedRuns,
         opposingStartingPitcherId: opposingStarter.playerId || '',
         opposingStartingPitcher: opposingStarter.name || '',
         lineupSlot: '',
@@ -771,7 +830,11 @@ function buildGamePlayerRows({ date, game, schedule, scores, simId, sim, project
         position: '',
         role: player.role || '',
         ...blankHittingStats(),
-        ...pitcherStats(player.average, player.histograms),
+        ...pitcherStats(player.average, player.histograms, {
+          playerId: player.playerId,
+          date,
+          role: player.role,
+        }),
         error: '',
       });
     });
@@ -780,7 +843,7 @@ function buildGamePlayerRows({ date, game, schedule, scores, simId, sim, project
   return rows;
 }
 
-function hitterStats(average = {}) {
+function hitterStats(average = {}, histograms = {}, context = {}) {
   const singles = stat(average, '1B');
   const doubles = stat(average, '2B');
   const triples = stat(average, '3B');
@@ -815,10 +878,16 @@ function hitterStats(average = {}) {
     hitterPoints: roundStat(hitterPoints),
     pitcherPoints: null,
     expectedPoints: roundStat(hitterPoints),
+    ...simulateHitterOutcomes({
+      playerId: context.playerId,
+      date: context.date,
+      average,
+      histograms,
+    }),
   };
 }
 
-function pitcherStats(average = {}, histograms = {}) {
+function pitcherStats(average = {}, histograms = {}, context = {}) {
   const outs = stat(average, 'Outs');
   const inningsPitched = roundStat(outs / 3);
   const strikeouts = stat(average, 'K');
@@ -846,6 +915,15 @@ function pitcherStats(average = {}, histograms = {}) {
     cgShutoutPctEstimate * 2.5 +
     noHitterPctEstimate * 5;
 
+  const outcomePercentiles = isStartingPitcherRole(context.role)
+    ? simulatePitcherOutcomes({
+        playerId: context.playerId,
+        date: context.date,
+        average,
+        histograms,
+      })
+    : blankPitcherOutcomePercentiles();
+
   return {
     inningsPitched,
     outs,
@@ -860,7 +938,222 @@ function pitcherStats(average = {}, histograms = {}) {
     noHitterPctEstimate: roundStat(noHitterPctEstimate),
     pitcherPoints: roundStat(pitcherPoints),
     expectedPoints: roundStat(pitcherPoints),
+    ...outcomePercentiles,
   };
+}
+
+function isStartingPitcherRole(role) {
+  return ['starter', 'primary pitcher'].includes(String(role || '').trim().toLowerCase());
+}
+
+function blankPitcherOutcomePercentiles() {
+  return {
+    simulationCount: null,
+    simulationMean: null,
+    simulationStdDev: null,
+    p10: null,
+    p20: null,
+    p50: null,
+    p80: null,
+    p90: null,
+    probability30Plus: null,
+    simulatedWinProbability: null,
+    experienceVarianceMultiplier: null,
+    experienceConfidence: '',
+  };
+}
+
+async function applyPitcherExperienceAdjustments({ date, rows, pitcherSimulationInputs }) {
+  if (!pitcherSimulationInputs?.size) return { status: 'missing', matched: 0 };
+  const probablePitchers = await fetchMlbProbablePitchers(date);
+  if (!probablePitchers.size) return { status: 'missing', matched: 0 };
+
+  const starters = rows.filter((row) => row.playerType === 'pitcher' && isStartingPitcherRole(row.role));
+  const matched = starters
+    .map((row) => ({ row, mlb: probablePitchers.get(normalizePersonName(row.playerName)) }))
+    .filter((entry) => entry.mlb?.id);
+  const histories = new Map();
+
+  await mapWithConcurrency(matched, 4, async ({ mlb }) => {
+    if (histories.has(mlb.id)) return;
+    histories.set(mlb.id, await loadMlbPitcherHistory(mlb.id, Number(date.slice(0, 4)), date));
+  });
+
+  let applied = 0;
+  for (const { row, mlb } of matched) {
+    const input = pitcherSimulationInputs.get(pitcherSimulationKey(row.playerId, row.playerName));
+    const history = histories.get(mlb.id);
+    if (!input || !history) continue;
+    const experience = pitcherExperienceBeforeDate(history, date);
+    Object.assign(row, simulatePitcherOutcomes({
+      playerId: input.playerId,
+      date,
+      average: input.average,
+      histograms: input.histograms,
+      experience,
+    }));
+    row.mlbPitcherId = String(mlb.id);
+    row.seasonInningsBeforeStart = roundStat(experience.seasonInnings);
+    row.priorMlbInnings = roundStat(experience.priorMlbInnings);
+    row.recentStarts = experience.recentStarts;
+    applied += 1;
+  }
+  return { status: applied ? 'applied' : 'missing', matched: applied };
+}
+
+async function fetchMlbProbablePitchers(date) {
+  const url = new URL(`${MLB_STATS_BASE_URL}/schedule`);
+  url.searchParams.set('sportId', '1');
+  url.searchParams.set('date', date);
+  url.searchParams.set('hydrate', 'probablePitcher');
+  const data = await fetchJson(url, { accept: 'application/json', 'user-agent': 'dfs-baseball-projections/1.0' });
+  const games = data?.dates?.[0]?.games || [];
+  const index = new Map();
+  for (const game of games) {
+    for (const side of ['away', 'home']) {
+      const pitcher = game.teams?.[side]?.probablePitcher;
+      const key = normalizePersonName(pitcher?.fullName);
+      if (key && pitcher?.id) index.set(key, { id: String(pitcher.id), name: pitcher.fullName });
+    }
+  }
+  return index;
+}
+
+async function fetchMlbProbablePitcherRows(date, projectionSystem) {
+  const url = new URL(`${MLB_STATS_BASE_URL}/schedule`);
+  url.searchParams.set('sportId', '1');
+  url.searchParams.set('date', date);
+  url.searchParams.set('hydrate', 'probablePitcher');
+  const data = await fetchJson(url, { accept: 'application/json', 'user-agent': 'dfs-baseball-projections/1.0' });
+  const games = data?.dates?.[0]?.games || [];
+  const rows = [];
+
+  for (const game of games) {
+    const gameTimeUtc = game.gameDate || '';
+    for (const side of ['away', 'home']) {
+      const teamEntry = game.teams?.[side];
+      const opponentSide = side === 'away' ? 'home' : 'away';
+      const opponentEntry = game.teams?.[opponentSide];
+      const pitcher = teamEntry?.probablePitcher;
+      if (!pitcher?.id || !pitcher?.fullName) continue;
+
+      const opposingPitcher = opponentEntry?.probablePitcher;
+      rows.push({
+        date,
+        gameId: String(game.gamePk || ''),
+        mlbGameId: String(game.gamePk || ''),
+        simId: '',
+        gameKey: String(game.gamePk || ''),
+        projectionSystem,
+        gameTimeUtc,
+        gameTimeLocal: formatLocalTime(gameTimeUtc),
+        displayTime: formatDisplayTime(gameTimeUtc),
+        status: game.status?.detailedState || '',
+        simulations: null,
+        simLoadDate: '',
+        playerType: 'pitcher',
+        side,
+        teamId: String(teamEntry?.team?.id || ''),
+        team: teamEntry?.team?.name || '',
+        teamAbbrev: normalizeTeam(teamEntry?.team?.abbreviation || ''),
+        teamExpectedRuns: null,
+        opponentId: String(opponentEntry?.team?.id || ''),
+        opponent: opponentEntry?.team?.name || '',
+        opponentAbbrev: normalizeTeam(opponentEntry?.team?.abbreviation || ''),
+        opponentExpectedRuns: null,
+        opposingStartingPitcherId: String(opposingPitcher?.id || ''),
+        opposingStartingPitcher: opposingPitcher?.fullName || '',
+        lineupSlot: '',
+        lineupSource: 'MLB probable pitcher',
+        confirmedLineup: false,
+        playerId: String(pitcher.id),
+        mlbPitcherId: String(pitcher.id),
+        playerName: pitcher.fullName,
+        position: '',
+        role: 'Starter',
+        ...blankHittingStats(),
+        ...blankPitchingStats(),
+        pitcherPoints: null,
+        expectedPoints: null,
+        ...blankPitcherOutcomePercentiles(),
+        error: '',
+      });
+    }
+  }
+
+  return rows;
+}
+
+async function loadMlbPitcherHistory(mlbPitcherId, season, snapshotDate) {
+  const path = join(CACHE_ROOT, 'mlb-pitcher-history', `${safeSegment(snapshotDate)}-${safeSegment(mlbPitcherId)}.json`);
+  const cached = await getCachedJson(path);
+  if (cached?.mlbPitcherId) return cached;
+  const url = new URL(`${MLB_STATS_BASE_URL}/people/${encodeURIComponent(mlbPitcherId)}/stats`);
+  url.searchParams.set('stats', 'gameLog,yearByYear');
+  url.searchParams.set('group', 'pitching');
+  url.searchParams.set('season', String(season));
+  url.searchParams.set('gameType', 'R');
+  const data = await fetchJson(url, { accept: 'application/json', 'user-agent': 'dfs-baseball-projections/1.0' });
+  const blocks = Array.isArray(data?.stats) ? data.stats : [];
+  const history = {
+    mlbPitcherId: String(mlbPitcherId),
+    season,
+    snapshotDate,
+    gameLog: (blocks.find((block) => block?.type?.displayName === 'gameLog')?.splits || []).map((split) => ({
+      date: split.date || '',
+      outs: numberOrNull(split.stat?.outs) ?? inningsToOuts(split.stat?.inningsPitched),
+      gamesStarted: numberOrNull(split.stat?.gamesStarted) ?? 0,
+    })),
+    yearByYear: (blocks.find((block) => block?.type?.displayName === 'yearByYear')?.splits || []).map((split) => ({
+      season: Number(split.season),
+      outs: numberOrNull(split.stat?.outs) ?? inningsToOuts(split.stat?.inningsPitched),
+    })),
+  };
+  await writeCachedJson(path, history);
+  return history;
+}
+
+function pitcherExperienceBeforeDate(history, date) {
+  const season = Number(date.slice(0, 4));
+  const priorGames = (history?.gameLog || []).filter((game) => game.date && game.date < date);
+  const priorMlbOuts = (history?.yearByYear || [])
+    .filter((row) => row.season < season)
+    .reduce((sum, row) => sum + (Number(row.outs) || 0), 0);
+  return {
+    seasonInnings: priorGames.reduce((sum, game) => sum + (Number(game.outs) || 0), 0) / 3,
+    priorMlbInnings: priorMlbOuts / 3,
+    recentStarts: priorGames.filter((game) => Number(game.gamesStarted) > 0).slice(-8).length,
+    minorLeagueInnings: 0,
+  };
+}
+
+function inningsToOuts(value) {
+  const [innings = '0', remainder = '0'] = String(value || '0').split('.');
+  return Math.max(0, Number(innings) * 3 + Number(remainder));
+}
+
+function pitcherSimulationKey(playerId, name) {
+  return String(playerId || normalizePersonName(name));
+}
+
+function normalizePersonName(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '');
+}
+
+async function mapWithConcurrency(items, limit, mapper) {
+  let next = 0;
+  async function worker() {
+    while (next < items.length) {
+      const index = next;
+      next += 1;
+      await mapper(items[index], index);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
 }
 
 function blankHittingStats() {

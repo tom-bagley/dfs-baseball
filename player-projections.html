@@ -361,8 +361,27 @@
       width: 110px;
     }
 
-    .stack-input {
-      width: 60px;
+    .optimizer-select {
+      max-width: 150px;
+    }
+
+    .optimizer-check {
+      display: flex;
+      grid-template-columns: none;
+      align-items: center;
+      gap: 7px;
+      min-height: 40px;
+      padding-bottom: 1px;
+      color: var(--ink);
+      font-size: 0.78rem;
+      text-transform: none;
+    }
+
+    .optimizer-check input {
+      width: 16px;
+      height: 16px;
+      min-height: 16px;
+      margin: 0;
     }
 
     .excluded-bar {
@@ -748,15 +767,44 @@
           <button id="refreshButton" class="primary" type="button" title="Refresh player projections for the selected date">
             Refresh
           </button>
+          <button id="demoButton" class="file-button" type="button" title="Load a deterministic fake slate for testing the optimizer">
+            Demo Slate
+          </button>
         </div>
         <div class="control-group optimizer-controls">
+          <label title="Cash uses an unstacked preset; GPP starts with a correlated 5-3 build">
+            Contest
+            <select id="contestModeInput" class="optimizer-select">
+              <option value="cash">Cash</option>
+              <option value="gpp" selected>GPP</option>
+            </select>
+          </label>
           <label>
             Budget
             <input id="budgetInput" class="budget-input" type="number" min="100" step="100" value="50000">
           </label>
-          <label title="Minimum hitters from a single team, to build stacks (0 or 1 = no stacking)">
-            Stack
-            <input id="stackInput" class="stack-input" type="number" min="0" max="8" step="1" value="4">
+          <label title="Exact hitter distribution for multi-team constructions; primary-only options allow the remaining hitters to come from any teams">
+            Construction
+            <select id="stackConstructionInput" class="optimizer-select">
+              <option value="none">None</option>
+              <option value="4">4+ primary</option>
+              <option value="5">5+ primary</option>
+              <option value="5-3" selected>5-3</option>
+              <option value="5-2-1">5-2-1</option>
+              <option value="4-4">4-4</option>
+              <option value="4-3-1">4-3-1</option>
+              <option value="4-2-2">4-2-2</option>
+            </select>
+          </label>
+          <label title="Require this many adjacent batting-order positions inside the primary stack; 8-9-1 counts as adjacent">
+            Primary run
+            <select id="consecutiveInput" class="optimizer-select">
+              <option value="0">Off</option>
+              <option value="2" selected>2 consecutive</option>
+              <option value="3">3 consecutive</option>
+              <option value="4">4 consecutive</option>
+              <option value="all">Entire primary</option>
+            </select>
           </label>
           <label title="Spread player exposure across the ten builds: limit how many players any two builds may share, or cap how many builds a single player can appear in">
             Diversity
@@ -764,8 +812,12 @@
               <option value="off">Off (true top 10)</option>
               <option value="overlap-6">Max 6 shared</option>
               <option value="overlap-4">Max 4 shared</option>
-              <option value="cap-50">Player cap 50%</option>
+              <option value="cap-50" selected>Player cap 50%</option>
             </select>
+          </label>
+          <label class="optimizer-check" title="Reject a lineup when one of its hitters faces one of its selected pitchers">
+            <input id="avoidOpposingPitcherInput" type="checkbox" checked>
+            Avoid hitter vs P
           </label>
           <button id="maxPointsButton" type="button" class="file-button" title="Build the highest-scoring lineup (2 SP, 1 C, 1 1B, 1 2B, 1 3B, 1 SS, 3 OF) that fits the budget and stack requirement">
             Max Points
@@ -847,12 +899,22 @@
               <th data-sort-key="gameTimeUtc">Time</th>
               <th data-sort-key="playerName">Player</th>
               <th class="team-abbrev-col" data-sort-key="teamAbbrev">Team</th>
+              <th data-sort-key="side" title="Home or away">H/A</th>
               <th class="team-abbrev-col" data-sort-key="opponentAbbrev">Opp</th>
-              <th data-sort-key="opposingStartingPitcher">Opposing SP</th>
+              <th class="hitter-col" data-sort-key="opposingStartingPitcher">Opposing SP</th>
+              <th class="num pitcher-col" data-sort-key="opponentExpectedRuns" title="Opposing team's projected runs from the game simulation">Opp Team Exp.</th>
               <th class="num hitter-col" data-sort-key="lineupSlot">Slot</th>
               <th class="hitter-col" data-sort-key="position">Pos</th>
               <th class="pitcher-col" data-sort-key="role">Role</th>
               <th class="num" data-sort-key="expectedPoints">Expected</th>
+              <th class="num" data-sort-key="p10" title="10th-percentile simulated DraftKings points">P10</th>
+              <th class="num" data-sort-key="p20" title="20th-percentile simulated DraftKings points">P20</th>
+              <th class="num" data-sort-key="p50" title="Median simulated DraftKings points">P50</th>
+              <th class="num" data-sort-key="p80" title="80th-percentile simulated DraftKings points">P80</th>
+              <th class="num" data-sort-key="p90" title="90th-percentile simulated DraftKings points">P90</th>
+              <th class="num pitcher-col" data-sort-key="seasonInningsBeforeStart" title="MLB innings recorded before this start">Season IP</th>
+              <th class="pitcher-col" data-sort-key="experienceVarianceMultiplier" title="Confidence from season innings, prior MLB innings, and recent starts; a larger multiplier produces a wider outcome range">Uncertainty</th>
+              <th class="num pitcher-col" data-sort-key="probability30Plus" title="Probability of scoring at least 30 DraftKings points">P(30+)</th>
               <th class="num" data-sort-key="dkSalary">DK Salary</th>
               <th class="num" data-sort-key="dkDollarsPerPoint">$/Pt</th>
               <th data-sort-key="dkRosterPosition">DK Pos</th>
@@ -864,7 +926,7 @@
             </tr>
           </thead>
           <tbody id="tableBody">
-            <tr><td class="empty" colspan="11">No player projections loaded yet.</td></tr>
+            <tr><td class="empty" colspan="12">No player projections loaded yet.</td></tr>
           </tbody>
         </table>
       </div>
@@ -888,6 +950,7 @@
 
     const dateInput = document.querySelector("#dateInput");
     const refreshButton = document.querySelector("#refreshButton");
+    const demoButton = document.querySelector("#demoButton");
     const dkSlateSelect = document.querySelector("#dkSlateSelect");
     const gameFilter = document.querySelector("#gameFilter");
     const gameFilterButton = document.querySelector("#gameFilterButton");
@@ -896,9 +959,12 @@
     const gamesAllButton = document.querySelector("#gamesAllButton");
     const gamesNoneButton = document.querySelector("#gamesNoneButton");
     const positionRoleFilter = document.querySelector("#positionRoleFilter");
+    const contestModeInput = document.querySelector("#contestModeInput");
     const budgetInput = document.querySelector("#budgetInput");
-    const stackInput = document.querySelector("#stackInput");
+    const stackConstructionInput = document.querySelector("#stackConstructionInput");
+    const consecutiveInput = document.querySelector("#consecutiveInput");
     const diversityInput = document.querySelector("#diversityInput");
+    const avoidOpposingPitcherInput = document.querySelector("#avoidOpposingPitcherInput");
     const maxPointsButton = document.querySelector("#maxPointsButton");
     const optimizerShell = document.querySelector("#optimizerShell");
     const optimizerSummary = document.querySelector("#optimizerSummary");
@@ -922,6 +988,10 @@
       refreshPlayers(dateInput.value);
     });
 
+    demoButton.addEventListener("click", () => {
+      loadDemoSlate();
+    });
+
     dateInput.addEventListener("change", () => {
       loadDkSlates(dateInput.value);
     });
@@ -933,6 +1003,19 @@
 
     maxPointsButton.addEventListener("click", () => {
       calculateMaxPoints();
+    });
+
+    contestModeInput.addEventListener("change", () => {
+      if (contestModeInput.value === "cash") {
+        stackConstructionInput.value = "none";
+        consecutiveInput.value = "0";
+        diversityInput.value = "off";
+      } else {
+        stackConstructionInput.value = "5-3";
+        consecutiveInput.value = "2";
+        diversityInput.value = "cap-50";
+      }
+      avoidOpposingPitcherInput.checked = true;
     });
 
     optimizerBody.addEventListener("click", (event) => {
@@ -1146,6 +1229,153 @@
 
     }
 
+    function loadDemoSlate() {
+      const teams = ["ARI", "ATL", "BAL", "BOS", "CHC", "CIN", "CLE", "COL", "DET", "HOU", "LAD", "NYY"];
+      const hitterPositions = ["OF", "2B", "1B", "OF", "3B", "OF", "SS", "C", "OF"];
+      const orderBonuses = [3.4, 3.1, 3.6, 3.8, 2.7, 2.2, 1.7, 1.1, 1.4];
+      const rows = [];
+
+      for (let teamIndex = 0; teamIndex < teams.length; teamIndex += 2) {
+        const away = teams[teamIndex];
+        const home = teams[teamIndex + 1];
+        const gameNumber = teamIndex / 2;
+        const gameKey = `demo-game-${gameNumber + 1}`;
+        const gameTimeUtc = new Date(Date.UTC(2026, 6, 14, 23 + Math.floor(gameNumber / 2), (gameNumber % 2) * 30)).toISOString();
+
+        for (const [side, team, opponent, teamOffset] of [
+          ["away", away, home, teamIndex],
+          ["home", home, away, teamIndex + 1],
+        ]) {
+          const opposingPitcherName = `${opponent} Demo Starter`;
+          const teamStrength = 2.4 - teamOffset * 0.12;
+          for (let lineupIndex = 0; lineupIndex < 9; lineupIndex += 1) {
+            const lineupSlot = lineupIndex + 1;
+            const expectedPoints = Number((5.1 + teamStrength + orderBonuses[lineupIndex] + ((teamOffset * 3 + lineupSlot) % 5) * 0.24).toFixed(2));
+            const dkSalary = Math.round((2050 + expectedPoints * 185 + ((teamOffset + lineupSlot) % 4) * 100) / 100) * 100;
+            const position = hitterPositions[lineupIndex];
+            rows.push({
+              date: dateInput.value,
+              gameId: gameKey,
+              mlbGameId: gameKey,
+              gameKey,
+              projectionSystem: "Demo",
+              gameTimeUtc,
+              gameTimeLocal: gameTimeUtc,
+              displayTime: formatDemoTime(gameTimeUtc),
+              status: "Demo",
+              simulations: 10000,
+              playerType: "hitter",
+              side,
+              team,
+              teamAbbrev: team,
+              opponentExpectedRuns: Number((3.65 + ((teamOffset + 1) % 5) * 0.29).toFixed(2)),
+              opponent,
+              opponentAbbrev: opponent,
+              opposingStartingPitcher: opposingPitcherName,
+              lineupSlot,
+              lineupSource: "confirmed",
+              confirmedLineup: true,
+              playerId: `demo-${team}-${lineupSlot}`,
+              playerName: `${team} Demo Hitter ${lineupSlot}`,
+              position,
+              role: "",
+              expectedPoints,
+              hitterPoints: expectedPoints,
+              pitcherPoints: null,
+              simulationCount: 10000,
+              simulationMean: expectedPoints,
+              simulationStdDev: Number((5.8 + (teamOffset % 3) * 0.6).toFixed(2)),
+              p10: 0,
+              p20: Number(Math.max(0, expectedPoints - 6.5).toFixed(2)),
+              p50: Number(Math.max(0, expectedPoints - 1.4).toFixed(2)),
+              p80: Number((expectedPoints + 5.6).toFixed(2)),
+              p90: Number((expectedPoints + 10.4).toFixed(2)),
+              dkSalary,
+              dkPosition: position,
+              dkRosterPosition: position,
+              dkDollarsPerPoint: Number((dkSalary / expectedPoints).toFixed(2)),
+              dkValue: Number((expectedPoints / (dkSalary / 1000)).toFixed(2)),
+              dkId: `demo-dk-${team}-${lineupSlot}`,
+              error: "",
+            });
+          }
+
+          const expectedPoints = Number((14.5 + (teams.length - teamOffset) * 0.55 + (teamOffset % 3) * 0.7).toFixed(2));
+          const dkSalary = 6800 + teamOffset * 250;
+          const outcomeSpread = 7 + (teamOffset % 4) * 1.1;
+          rows.push({
+            date: dateInput.value,
+            gameId: gameKey,
+            mlbGameId: gameKey,
+            gameKey,
+            projectionSystem: "Demo",
+            gameTimeUtc,
+            gameTimeLocal: gameTimeUtc,
+            displayTime: formatDemoTime(gameTimeUtc),
+            status: "Demo",
+            simulations: 10000,
+            playerType: "pitcher",
+            side,
+            team,
+            teamAbbrev: team,
+            opponentExpectedRuns: Number((3.65 + ((teamOffset + 1) % 5) * 0.29).toFixed(2)),
+            opponent,
+            opponentAbbrev: opponent,
+            opposingStartingPitcher: `${opponent} Demo Starter`,
+            lineupSlot: "",
+            lineupSource: "confirmed",
+            confirmedLineup: false,
+            playerId: `demo-${team}-pitcher`,
+            playerName: `${team} Demo Starter`,
+            position: "",
+            role: "Starter",
+            expectedPoints,
+            pitcherPoints: expectedPoints,
+            simulationCount: 10000,
+            simulationMean: expectedPoints,
+            simulationStdDev: Number(outcomeSpread.toFixed(2)),
+            p10: Number((expectedPoints - outcomeSpread * 1.3).toFixed(2)),
+            p20: Number((expectedPoints - outcomeSpread * 0.82).toFixed(2)),
+            p50: Number(expectedPoints.toFixed(2)),
+            p80: Number((expectedPoints + outcomeSpread * 0.82).toFixed(2)),
+            p90: Number((expectedPoints + outcomeSpread * 1.3).toFixed(2)),
+            probability30Plus: Number(Math.max(0.01, Math.min(0.75, 0.5 - (30 - expectedPoints) / (outcomeSpread * 5))).toFixed(3)),
+            experienceVarianceMultiplier: Number((1 + Math.max(0, 5 - teamOffset) * 0.08).toFixed(2)),
+            experienceConfidence: teamOffset < 3 ? "low" : teamOffset < 7 ? "medium" : "high",
+            seasonInningsBeforeStart: 4 + teamOffset * 7,
+            inningsPitched: Number((5.4 + (teamOffset % 4) * 0.25).toFixed(2)),
+            strikeouts: Number((5.2 + (teams.length - teamOffset) * 0.18).toFixed(2)),
+            win: Number((0.42 + (teams.length - teamOffset) * 0.012).toFixed(3)),
+            earnedRunsAllowed: Number((3.6 - (teams.length - teamOffset) * 0.09).toFixed(2)),
+            dkSalary,
+            dkPosition: "SP",
+            dkRosterPosition: "P",
+            dkDollarsPerPoint: Number((dkSalary / expectedPoints).toFixed(2)),
+            dkValue: Number((expectedPoints / (dkSalary / 1000)).toFixed(2)),
+            dkId: `demo-dk-${team}-pitcher`,
+            error: "",
+          });
+        }
+      }
+
+      applyPlayerRows({
+        rows,
+        date: dateInput.value,
+        projectionSystem: "Demo",
+        refreshedAt: new Date().toISOString(),
+        cache: { simsHit: 0, simsMiss: 0, draftKingsSalaries: "hit", draftKingsRows: rows.length, draftKingsMatched: rows.length },
+      });
+      setStatus(`Loaded a deterministic demo slate with ${teams.length} teams and ${rows.length} players.`);
+    }
+
+    function formatDemoTime(value) {
+      return new Intl.DateTimeFormat("en-US", {
+        timeZone: "America/Chicago",
+        hour: "numeric",
+        minute: "2-digit",
+      }).format(new Date(value));
+    }
+
     // Roster: 2 SP plus 1 C, 1 1B, 1 2B, 1 3B, 1 SS, 3 OF.
     const HITTER_SLOTS = ["C", "1B", "2B", "3B", "SS", "OF"];
     const HITTER_SLOT_NEEDS = [1, 1, 1, 1, 1, 3];
@@ -1194,11 +1424,9 @@
         return;
       }
 
-      const stackSize = Math.floor(Number(stackInput.value));
-      if (!Number.isFinite(stackSize) || stackSize < 0 || stackSize > 8) {
-        setStatus("Stack size must be between 0 and 8 (a lineup has 8 hitters).", true);
-        return;
-      }
+      const construction = constructionSettings(stackConstructionInput.value);
+      const consecutive = consecutiveSettings(consecutiveInput.value, construction.sizes[0] || 0);
+      const avoidOpposingPitcher = avoidOpposingPitcherInput.checked;
 
       const seen = new Set();
       const players = state.rows.filter((row) => {
@@ -1246,32 +1474,47 @@
         return;
       }
 
-      if (stackSize > 1) {
+      const primarySize = construction.sizes[0] || 0;
+      if (primarySize > 1) {
         const teamCounts = new Map();
         for (const hitter of hitters) {
           const team = hitter.row.teamAbbrev || "";
           if (team) teamCounts.set(team, (teamCounts.get(team) || 0) + 1);
         }
         const deepestTeam = Math.max(0, ...teamCounts.values());
-        if (deepestTeam < stackSize) {
+        if (deepestTeam < primarySize) {
           optimizerShell.hidden = true;
-          setStatus(`No team has ${stackSize} eligible hitters for the stack (deepest team has ${deepestTeam}). Lower the stack size.`, true);
+          setStatus(`No team has ${primarySize} eligible hitters for the primary stack (deepest team has ${deepestTeam}). Choose a smaller construction.`, true);
           return;
         }
       }
 
       const diversity = diversitySettings(diversityInput.value, MAX_BUILDS);
-      const builds = solveLineups(starters, hitters, budget, stackSize, MAX_BUILDS, diversity);
+      const builds = solveConfiguredLineups({
+        starters,
+        hitters,
+        budget,
+        construction,
+        consecutive,
+        avoidOpposingPitcher,
+        maxBuilds: MAX_BUILDS,
+        diversity,
+      });
 
       if (!builds.length) {
         optimizerShell.hidden = true;
-        const stackNote = stackSize > 1 ? ` with a ${stackSize}-hitter team stack` : "";
+        const stackNote = construction.label === "None" ? "" : ` with a ${construction.label} construction`;
+        const runNote = consecutive > 1 ? ` and ${consecutive} consecutive primary hitters` : "";
+        const conflictNote = avoidOpposingPitcher ? " without hitters facing a selected pitcher" : "";
         const excludeHint = excludedPlayers.size ? ", clearing excluded players," : "";
-        setStatus(`No valid lineup (2 SP, 1 C, 1 1B, 1 2B, 1 3B, 1 SS, 3 OF)${stackNote} fits within ${formatSalary(budget)}. Try raising the budget${excludeHint} or lowering the stack size.`, true);
+        setStatus(`No valid lineup (2 SP, 1 C, 1 1B, 1 2B, 1 3B, 1 SS, 3 OF)${stackNote}${runNote}${conflictNote} fits within ${formatSalary(budget)}. Try raising the budget${excludeHint} or relaxing a construction rule.`, true);
         return;
       }
 
-      const stackNote = stackSize > 1 ? ` with a ${stackSize}-hitter team stack` : "";
+      const contestNote = contestModeInput.value === "cash" ? "Cash" : "GPP";
+      const stackNote = construction.label === "None" ? ", no forced stack" : `, ${construction.label}`;
+      const runNote = consecutive > 1 ? `, ${consecutive} consecutive primary hitters` : "";
+      const conflictNote = avoidOpposingPitcher ? ", no hitters vs selected pitchers" : "";
       const excludeNote = excludedPlayers.size
         ? `, excluding ${excludedPlayers.size === 1 ? [...excludedPlayers.values()][0] : `${excludedPlayers.size} players`}`
         : "";
@@ -1281,7 +1524,7 @@
           ? `, max ${diversity.maxShared} shared players between builds`
           : `, each player in at most ${diversity.maxAppearances} builds`;
       const shortfallNote = diversity && builds.length < MAX_BUILDS ? ` Only ${builds.length} builds satisfy the diversity rule; relax it for more.` : "";
-      optimizerSummary.textContent = `Top ${builds.length} builds within ${formatSalary(budget)}${stackNote}${diversityNote}${excludeNote}: best ${builds[0].points.toFixed(2)} pts (2 SP, 1 C, 1 1B, 1 2B, 1 3B, 1 SS, 3 OF from ${starters.length + hitters.length} eligible players).${shortfallNote}`;
+      optimizerSummary.textContent = `${contestNote}: top ${builds.length} builds within ${formatSalary(budget)}${stackNote}${runNote}${conflictNote}${diversityNote}${excludeNote}. Best ${builds[0].points.toFixed(2)} pts (2 P, 8 hitters from ${starters.length + hitters.length} eligible players).${shortfallNote}`;
       optimizerBody.innerHTML = builds.map((build, index) => {
         const stackCounts = new Map();
         for (const pick of build.lineup) {
@@ -1289,7 +1532,11 @@
           const team = pick.row.teamAbbrev || "";
           if (team) stackCounts.set(team, (stackCounts.get(team) || 0) + 1);
         }
-        const [stackTeam, stackCount] = [...stackCounts.entries()].sort((a, b) => b[1] - a[1])[0] || ["", 0];
+        const stackLabel = [...stackCounts.entries()]
+          .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+          .filter(([, count]) => count > 1)
+          .map(([team, count]) => `${count}x ${teamLogo(team)}`)
+          .join(" + ");
         const players = build.lineup.map((pick) => {
           const name = pick.row.playerName || "--";
           const key = lineupPlayerKey(pick.row);
@@ -1302,7 +1549,7 @@
             <td class="num">${index + 1}</td>
             <td class="num">${build.points.toFixed(2)}</td>
             <td class="num">${formatSalary(build.salary)}</td>
-            <td>${stackCount > 1 ? `${stackCount}x ${teamLogo(stackTeam)}` : "--"}</td>
+            <td>${stackLabel || "--"}</td>
             <td class="build-players">${players}</td>
           </tr>
         `;
@@ -1326,6 +1573,286 @@
         if (index >= 0) slots.add(index);
       }
       return [...slots];
+    }
+
+    function constructionSettings(value) {
+      const normalized = String(value || "none");
+      if (normalized === "4") return { value: normalized, label: "4+ primary", sizes: [4], exact: false };
+      if (normalized === "5") return { value: normalized, label: "5+ primary", sizes: [5], exact: false };
+      const sizes = normalized.split("-").map(Number).filter((size) => Number.isInteger(size) && size > 0);
+      if (sizes.length > 1 && sizes.reduce((sum, size) => sum + size, 0) === 8) {
+        return { value: normalized, label: normalized, sizes, exact: true };
+      }
+      return { value: "none", label: "None", sizes: [], exact: false };
+    }
+
+    function consecutiveSettings(value, primarySize) {
+      if (value === "all") return primarySize;
+      const count = Math.floor(Number(value));
+      return Number.isFinite(count) && count > 1 ? Math.min(count, primarySize) : 0;
+    }
+
+    function solveConfiguredLineups({ starters, hitters, budget, construction, consecutive, avoidOpposingPitcher, maxBuilds, diversity }) {
+      if (construction.exact) {
+        return solveExactStackLineups({
+          starters,
+          hitters,
+          budget,
+          sizes: construction.sizes,
+          consecutive,
+          avoidOpposingPitcher,
+          maxBuilds,
+          diversity,
+        });
+      }
+
+      // Ask the existing exact solver for a deeper candidate pool, then apply
+      // the cross-player rules that depend on the reconstructed lineup.
+      const primarySize = construction.sizes[0] || 0;
+      const candidateLimit = primarySize > 1 ? 180 : 40;
+      const candidates = solveLineups(starters, hitters, budget, primarySize, candidateLimit, null);
+      return acceptLegalBuilds(candidates, {
+        maxBuilds,
+        diversity,
+        primarySize,
+        consecutive,
+        avoidOpposingPitcher,
+      });
+    }
+
+    function acceptLegalBuilds(candidates, rules) {
+      const acceptor = buildAcceptor(rules.diversity);
+      const builds = [];
+      for (const build of [...candidates].sort((a, b) => b.points - a.points)) {
+        if (!lineupPassesRules(build.lineup, rules)) continue;
+        if (acceptor.rejection(build.lineup)) continue;
+        acceptor.add(build.lineup);
+        builds.push(build);
+        if (builds.length >= rules.maxBuilds) break;
+      }
+      return builds;
+    }
+
+    function lineupPassesRules(lineup, { primarySize = 0, consecutive = 0, avoidOpposingPitcher = true } = {}) {
+      const hitters = lineup.filter((pick) => pick.slot !== "P");
+      const counts = new Map();
+      for (const pick of hitters) {
+        const team = String(pick.row.teamAbbrev || "").toUpperCase();
+        if (team) counts.set(team, (counts.get(team) || 0) + 1);
+      }
+      // DraftKings MLB Classic allows no more than five hitters from one club.
+      if ([...counts.values()].some((count) => count > 5)) return false;
+      if (primarySize > 1) {
+        const primaryTeams = [...counts.entries()].filter(([, count]) => count >= primarySize).map(([team]) => team);
+        if (!primaryTeams.length) return false;
+        if (consecutive > 1 && !primaryTeams.some((team) => hasConsecutiveBatters(
+          hitters.filter((pick) => String(pick.row.teamAbbrev || "").toUpperCase() === team).map((pick) => pick.row),
+          consecutive,
+        ))) return false;
+      }
+      return !avoidOpposingPitcher || !hasPitcherHitterConflict(lineup);
+    }
+
+    function hasPitcherHitterConflict(lineup) {
+      const hitterTeams = new Set(lineup
+        .filter((pick) => pick.slot !== "P")
+        .map((pick) => String(pick.row.teamAbbrev || "").toUpperCase())
+        .filter(Boolean));
+      return lineup
+        .filter((pick) => pick.slot === "P")
+        .some((pick) => hitterTeams.has(String(pick.row.opponentAbbrev || "").toUpperCase()));
+    }
+
+    function hasConsecutiveBatters(rows, required) {
+      if (!(required > 1)) return true;
+      const slots = new Set(rows
+        .map((row) => Number(row.lineupSlot))
+        .filter((slot) => Number.isInteger(slot) && slot >= 1 && slot <= 9));
+      if (slots.size < required) return false;
+      for (let start = 1; start <= 9; start += 1) {
+        let complete = true;
+        for (let offset = 0; offset < required; offset += 1) {
+          const slot = ((start - 1 + offset) % 9) + 1;
+          if (!slots.has(slot)) {
+            complete = false;
+            break;
+          }
+        }
+        if (complete) return true;
+      }
+      return false;
+    }
+
+    function solveExactStackLineups({ starters, hitters, budget, sizes, consecutive, avoidOpposingPitcher, maxBuilds, diversity }) {
+      const groupsByStage = sizes.map((size, stage) => buildTeamGroups(hitters, size, stage === 0 ? consecutive : 0));
+
+      let partials = [{ teams: [], hitters: [], points: 0, salary: 0 }];
+      for (let stage = 0; stage < sizes.length; stage += 1) {
+        const size = sizes[stage];
+        const teamGroups = groupsByStage[stage];
+        let next = [];
+        for (const partial of partials) {
+          for (const [team, groups] of teamGroups) {
+            if (partial.teams.includes(team)) continue;
+            // Equal-sized groups are interchangeable; canonical team order
+            // avoids generating the same 4-4 or 4-2-2 build repeatedly.
+            const equalGroupsInterchangeable = stage > 0
+              && size === sizes[stage - 1]
+              && !(stage === 1 && consecutive > 1);
+            if (equalGroupsInterchangeable && team < partial.teams[stage - 1]) continue;
+            for (const group of groups) {
+              const salary = partial.salary + group.salary;
+              if (salary >= budget) continue;
+              next.push({
+                teams: [...partial.teams, team],
+                hitters: [...partial.hitters, ...group.hitters],
+                points: partial.points + group.points,
+                salary,
+              });
+              if (next.length >= 50000) next = pruneStackPartials(next, 8000);
+            }
+          }
+        }
+        partials = pruneStackPartials(next, 8000);
+        if (!partials.length) return [];
+      }
+
+      const pitcherPairs = buildPitcherPairs(starters);
+      const candidates = [];
+      for (const partial of partials) {
+        const hitterPicks = assignHitterSlots(partial.hitters);
+        if (!hitterPicks) continue;
+        const hitterTeams = new Set(partial.teams);
+        let pairsAdded = 0;
+        for (const pair of pitcherPairs) {
+          if (partial.salary + pair.salary > budget) continue;
+          if (avoidOpposingPitcher && pair.opponents.some((team) => hitterTeams.has(team))) continue;
+          const lineup = [
+            { slot: "P", row: pair.rows[0] },
+            { slot: "P", row: pair.rows[1] },
+            ...hitterPicks,
+          ];
+          candidates.push({
+            points: partial.points + pair.points,
+            salary: partial.salary + pair.salary,
+            lineup,
+          });
+          pairsAdded += 1;
+          if (pairsAdded >= 4) break;
+        }
+      }
+
+      return acceptLegalBuilds(candidates, {
+        maxBuilds,
+        diversity,
+        primarySize: sizes[0],
+        consecutive,
+        avoidOpposingPitcher,
+      });
+    }
+
+    function buildTeamGroups(hitters, size, consecutive) {
+      const byTeam = new Map();
+      for (const hitter of hitters) {
+        const team = String(hitter.row.teamAbbrev || "").toUpperCase();
+        if (!team) continue;
+        if (!byTeam.has(team)) byTeam.set(team, []);
+        byTeam.get(team).push(hitter);
+      }
+
+      const result = new Map();
+      for (const [team, teamHitters] of byTeam) {
+        if (teamHitters.length < size) continue;
+        const groups = [];
+        const chosen = [];
+        const visit = (start) => {
+          if (chosen.length === size) {
+            if (consecutive > 1 && !hasConsecutiveBatters(chosen.map((hitter) => hitter.row), consecutive)) return;
+            groups.push({
+              hitters: [...chosen],
+              points: chosen.reduce((sum, hitter) => sum + hitter.row.expectedPoints, 0),
+              salary: chosen.reduce((sum, hitter) => sum + hitter.row.dkSalary, 0),
+            });
+            return;
+          }
+          const needed = size - chosen.length;
+          for (let i = start; i <= teamHitters.length - needed; i += 1) {
+            chosen.push(teamHitters[i]);
+            visit(i + 1);
+            chosen.pop();
+          }
+        };
+        visit(0);
+        const selected = selectTeamGroups(groups, 70);
+        if (selected.length) result.set(team, selected);
+      }
+      return result;
+    }
+
+    function selectTeamGroups(groups, limit) {
+      if (groups.length <= limit) return groups;
+      const selected = new Map();
+      const keyOf = (group) => group.hitters.map((hitter) => lineupPlayerKey(hitter.row)).sort().join("~");
+      const take = (ordered, count) => {
+        for (const group of ordered.slice(0, count)) selected.set(keyOf(group), group);
+      };
+      take([...groups].sort((a, b) => b.points - a.points), Math.ceil(limit * 0.5));
+      take([...groups].sort((a, b) => (b.points / b.salary) - (a.points / a.salary)), Math.ceil(limit * 0.3));
+      take([...groups].sort((a, b) => a.salary - b.salary || b.points - a.points), Math.ceil(limit * 0.2));
+      return [...selected.values()].slice(0, limit);
+    }
+
+    function pruneStackPartials(partials, limit) {
+      if (partials.length <= limit) return partials;
+      const selected = new Map();
+      const keyOf = (partial) => partial.hitters.map((hitter) => lineupPlayerKey(hitter.row)).sort().join("~");
+      const take = (ordered, count) => {
+        for (const partial of ordered.slice(0, count)) selected.set(keyOf(partial), partial);
+      };
+      take([...partials].sort((a, b) => b.points - a.points), Math.ceil(limit * 0.45));
+      take([...partials].sort((a, b) => (b.points / b.salary) - (a.points / a.salary)), Math.ceil(limit * 0.3));
+      take([...partials].sort((a, b) => (b.points - b.salary / 2000) - (a.points - a.salary / 2000)), Math.ceil(limit * 0.2));
+      take([...partials].sort((a, b) => a.salary - b.salary || b.points - a.points), Math.ceil(limit * 0.1));
+      return [...selected.values()].slice(0, limit);
+    }
+
+    function buildPitcherPairs(starters) {
+      const pairs = [];
+      for (let i = 0; i < starters.length; i += 1) {
+        for (let j = i + 1; j < starters.length; j += 1) {
+          pairs.push({
+            rows: [starters[i], starters[j]],
+            points: starters[i].expectedPoints + starters[j].expectedPoints,
+            salary: starters[i].dkSalary + starters[j].dkSalary,
+            opponents: [starters[i], starters[j]]
+              .map((row) => String(row.opponentAbbrev || "").toUpperCase())
+              .filter(Boolean),
+          });
+        }
+      }
+      return pairs.sort((a, b) => b.points - a.points);
+    }
+
+    function assignHitterSlots(hitters) {
+      const needs = [...HITTER_SLOT_NEEDS];
+      const ordered = [...hitters].sort((a, b) => a.slots.length - b.slots.length || b.row.expectedPoints - a.row.expectedPoints);
+      const assigned = [];
+      const visit = (index) => {
+        if (index === ordered.length) return true;
+        const hitter = ordered[index];
+        for (const slotIndex of hitter.slots) {
+          if (needs[slotIndex] <= 0) continue;
+          needs[slotIndex] -= 1;
+          assigned.push({ slot: HITTER_SLOTS[slotIndex], row: hitter.row });
+          if (visit(index + 1)) return true;
+          assigned.pop();
+          needs[slotIndex] += 1;
+        }
+        return false;
+      };
+      if (!visit(0)) return null;
+      const slotOrder = ["P", ...HITTER_SLOTS];
+      return assigned.sort((a, b) => slotOrder.indexOf(a.slot) - slotOrder.indexOf(b.slot) || b.row.expectedPoints - a.row.expectedPoints);
     }
 
     // Exact optimum via dynamic programming: fill the six hitter slots with a
@@ -1883,12 +2410,22 @@
           <td>${escapeHtml(row.displayTime)}</td>
           <td class="player${row.playerName && excludedPlayers.has(lineupPlayerKey(row)) ? " excluded-player" : ""}">${escapeHtml(row.playerName || row.error || "--")}${confirmedLineupMarker(row)}${excludeToggleButton(row)}</td>
           <td class="team-abbrev-col">${teamLogo(row.teamAbbrev)}</td>
+          <td>${escapeHtml(homeAwayLabel(row.side))}</td>
           <td class="team-abbrev-col">${teamLogo(row.opponentAbbrev)}</td>
-          <td>${escapeHtml(row.opposingStartingPitcher || "--")}</td>
+          <td class="hitter-col">${escapeHtml(row.opposingStartingPitcher || "--")}</td>
+          <td class="num pitcher-col">${formatNumber(row.opponentExpectedRuns, 2)}</td>
           <td class="num hitter-col">${formatWhole(row.lineupSlot)}</td>
           <td class="hitter-col">${escapeHtml(row.position || "")}</td>
           <td class="pitcher-col">${escapeHtml(row.role || "")}</td>
           <td class="num">${formatNumber(row.expectedPoints, 2)}</td>
+          <td class="num">${formatNumber(row.p10, 2)}</td>
+          <td class="num">${formatNumber(row.p20, 2)}</td>
+          <td class="num">${formatNumber(row.p50, 2)}</td>
+          <td class="num">${formatNumber(row.p80, 2)}</td>
+          <td class="num">${formatNumber(row.p90, 2)}</td>
+          <td class="num pitcher-col">${formatNumber(row.seasonInningsBeforeStart, 1)}</td>
+          <td class="pitcher-col">${formatPitcherUncertainty(row)}</td>
+          <td class="num pitcher-col">${formatPercent(row.probability30Plus)}</td>
           <td class="num">${formatSalary(row.dkSalary)}</td>
           <td class="num">${formatMoneyPerPoint(row.dkDollarsPerPoint)}</td>
           <td>${escapeHtml(row.dkRosterPosition || row.dkPosition || "")}</td>
@@ -1921,7 +2458,7 @@
 
     function defaultDirection(key) {
       if (key === "dkDollarsPerPoint") return "asc";
-      return ["gameTimeUtc", "playerName", "teamAbbrev", "opponentAbbrev", "opposingStartingPitcher", "position", "role", "dkRosterPosition"].includes(key) ? "asc" : "desc";
+      return ["gameTimeUtc", "playerName", "teamAbbrev", "side", "opponentAbbrev", "opposingStartingPitcher", "position", "role", "dkRosterPosition"].includes(key) ? "asc" : "desc";
     }
 
     function compactPlayerMetric(row) {
@@ -1938,6 +2475,13 @@
       return typeof value === "number" ? String(value) : "";
     }
 
+    function homeAwayLabel(side) {
+      const normalized = String(side || "").toLowerCase();
+      if (normalized === "home") return "H";
+      if (normalized === "away") return "A";
+      return "--";
+    }
+
     function formatNumber(value, digits) {
       return typeof value === "number" ? value.toFixed(digits) : "--";
     }
@@ -1948,6 +2492,18 @@
 
     function formatMoneyPerPoint(value) {
       return typeof value === "number" ? `$${value.toFixed(0)}` : "--";
+    }
+
+    function formatPercent(value) {
+      return typeof value === "number" ? `${(value * 100).toFixed(1)}%` : "--";
+    }
+
+    function formatPitcherUncertainty(row) {
+      const confidence = String(row.experienceConfidence || "");
+      const multiplier = row.experienceVarianceMultiplier;
+      if (!confidence && typeof multiplier !== "number") return "Base";
+      const label = confidence ? confidence[0].toUpperCase() + confidence.slice(1) : "Adjusted";
+      return typeof multiplier === "number" ? `${label} ${multiplier.toFixed(2)}×` : label;
     }
 
     function localDateString(date) {
@@ -2107,14 +2663,14 @@
     }
 
     function visibleSortKeys() {
-      const common = ["gameTimeUtc", "playerName", "teamAbbrev", "opponentAbbrev", "opposingStartingPitcher", "expectedPoints", "dkSalary", "dkDollarsPerPoint", "dkRosterPosition"];
-      const hitter = ["lineupSlot", "position"];
-      const pitcher = ["role", "pitcherPoints", "inningsPitched", "strikeouts", "win", "earnedRunsAllowed"];
+      const common = ["gameTimeUtc", "playerName", "teamAbbrev", "side", "opponentAbbrev", "expectedPoints", "p10", "p20", "p50", "p80", "p90", "dkSalary", "dkDollarsPerPoint", "dkRosterPosition"];
+      const hitter = ["opposingStartingPitcher", "lineupSlot", "position"];
+      const pitcher = ["opponentExpectedRuns", "role", "pitcherPoints", "inningsPitched", "strikeouts", "win", "earnedRunsAllowed", "seasonInningsBeforeStart", "experienceVarianceMultiplier", "probability30Plus"];
       return new Set([...common, ...(selectedPositionFilter().type === "pitcher" ? pitcher : hitter)]);
     }
 
     function visibleColumnCount() {
-      return selectedPositionFilter().type === "pitcher" ? 15 : 11;
+      return selectedPositionFilter().type === "pitcher" ? 24 : 17;
     }
 
     function rowGameKey(row) {
@@ -2155,6 +2711,7 @@
     updateViewMode();
     updateHeaderState();
     loadDkSlates(dateInput.value);
+    if (new URLSearchParams(window.location.search).get("demo") === "1") loadDemoSlate();
   </script>
 </body>
 </html>

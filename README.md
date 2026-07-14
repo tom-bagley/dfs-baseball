@@ -42,6 +42,10 @@ Cached FanGraphs sims are written to `out/cache/` by default. Set `CACHE_DIR` to
 
 On the Players page, use the `DK Slate` dropdown to pull DraftKings salaries automatically: it lists that date's classic MLB slates (main, early, night, turbo) straight from the DraftKings lobby, and selecting one downloads the player pool and salaries for that slate. Salaries are cached by date, joined to player projections on refresh, and shown in the player table.
 
+The lineup optimizer has Cash and GPP presets. GPP builds support 4+ or 5+ primary stacks and exact 5-3, 5-2-1, 4-4, 4-3-1, and 4-2-2 constructions. A primary stack can require adjacent batting-order positions (including the 8-9-1 wrap), and the optimizer rejects hitters facing either selected pitcher by default. Cash starts without a forced stack; every preset can be adjusted before building.
+
+During off days, click `Demo Slate` or open `/player-projections.html?demo=1` to load deterministic fake projections, salaries, confirmed batting orders, and starting pitchers. Demo players are clearly labeled and never written to the projection cache.
+
 After a slate loads, use the `Custom` button on any row to edit that game's batting orders and starting pitchers. The editor starts with FanGraphs' current sim inputs, lets you swap player ids from the loaded sim player list, then sends a custom FanGraphs simulation request and replaces that game in the table with the custom result. Repeated custom payloads are cached under `fangraphs-custom-sims`.
 
 ## Render Hosting
@@ -109,3 +113,21 @@ npm.cmd run export:players -- --date 2026-06-30 --output out/fangraphs-baseball-
 ```
 
 This writes one row per simulated hitter and pitcher, sorted by `expectedPoints` from highest to lowest. Hitter and pitcher points use the scoring rules from the request. Complete-game, complete-game shutout, and no-hitter pitcher bonuses are estimated from FanGraphs' marginal simulation histograms.
+
+Starting pitchers in the Players viewer also receive deterministic P10, P20, P50, P80, and P90 DraftKings outcomes from a 10,000-start conditional Monte Carlo model. The model connects workload, strikeouts, baserunners, runs, and win eligibility, then recenters the distribution on the FanGraphs expected-points projection. Historical experience can widen the distribution without changing its mean.
+
+Hitters receive deterministic P10, P20, P50, P80, and P90 DraftKings outcomes from 10,000 simulated games. The hitter model samples the matchup-specific FanGraphs histograms for each scoring event and uses shared game-quality, power, and speed factors so hits, runs, RBI, and steals are not treated as unrelated outcomes. A tested calibration offset is supported, but the application retains the unshifted distribution because it produced better interval coverage and median absolute error on the independent validation sample.
+
+Validate hitter percentiles against official MLB box scores with `npm.cmd run backtest:hitters -- --start 2026-07-06 --end 2026-07-12`. Because hitter scoring is discrete and bounded at zero, the summary reports both the fraction strictly below and at-or-below each quantile; a calibrated quantile target should fall between those two rates.
+
+## Pitcher Percentile Backtest
+
+```powershell
+npm.cmd run backtest:pitchers -- --start 2026-05-04 --end 2026-07-05
+```
+
+The pitcher backtest joins the original historical FanGraphs simulation to the official MLB box score, calculates actual DraftKings pitcher points, and measures P10/P20/P50/P80/P90 calibration. It compares the base simulation with an experience-adjusted distribution using season innings, prior MLB innings, and recent starts available before each game. Date payloads and pitcher histories are cached under `out/cache/pitcher-percentile-backtest/` so model tuning does not repeatedly download historical data.
+
+To validate simulations already saved by the viewer without requesting them from FanGraphs again, pass `--local-sim-cache out/cache/fangraphs-sims/rSteamer`.
+
+The provisional experience-strength value (`0.10`) was selected on May 4–June 15 and then frozen for a June 16–July 5 test. On 501 untouched test starts, actual outcomes fell below P20 20.96% of the time and exceeded P80 21.16% of the time. P10/P90 were somewhat narrow at 11.78% and 12.57%. Across all 1,549 matched starts, the adjusted rates were 10.39%, 22.08%, 20.08%, and 10.91% for P10/P20/P80/P90 respectively. Treat P20/P80 as the better-calibrated decision band for now, especially for low-confidence pitchers.

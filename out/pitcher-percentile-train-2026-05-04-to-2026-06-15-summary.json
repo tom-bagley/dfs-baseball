@@ -1,0 +1,246 @@
+{
+  "start": "2026-05-04",
+  "end": "2026-06-15",
+  "projectionSystem": "rSteamer",
+  "simulationsPerPitcher": 10000,
+  "uncertaintyStrength": 0.1,
+  "projectedStarterRows": 1128,
+  "matchedStarts": 1048,
+  "unmatchedOrMissingStarts": 80,
+  "models": {
+    "base": {
+      "starts": 1048,
+      "actualBelowP10": 0.104,
+      "actualBelowP20": 0.2357,
+      "actualAboveP80": 0.2061,
+      "actualAboveP90": 0.1116,
+      "p10ToP90Coverage": 0.7844,
+      "p20ToP80Coverage": 0.5582,
+      "meanPredictionBias": -0.08,
+      "medianAbsoluteError": 7.19,
+      "averagePinballLoss": 2.67,
+      "averageP10ToP90Width": 25.14
+    },
+    "experienceAdjusted": {
+      "starts": 1048,
+      "actualBelowP10": 0.0973,
+      "actualBelowP20": 0.2261,
+      "actualAboveP80": 0.1956,
+      "actualAboveP90": 0.1011,
+      "p10ToP90Coverage": 0.8015,
+      "p20ToP80Coverage": 0.5782,
+      "meanPredictionBias": -0.08,
+      "medianAbsoluteError": 7.19,
+      "averagePinballLoss": 2.66,
+      "averageP10ToP90Width": 25.89
+    }
+  },
+  "bySeasonInnings": {
+    "0-10": {
+      "base": {
+        "starts": 61,
+        "actualBelowP10": 0.1803,
+        "actualBelowP20": 0.377,
+        "actualAboveP80": 0.1148,
+        "actualAboveP90": 0.0656,
+        "p10ToP90Coverage": 0.7541,
+        "p20ToP80Coverage": 0.5082,
+        "meanPredictionBias": -3.8,
+        "medianAbsoluteError": 8.46,
+        "averagePinballLoss": 2.8,
+        "averageP10ToP90Width": 25.19
+      },
+      "experienceAdjusted": {
+        "starts": 61,
+        "actualBelowP10": 0.1639,
+        "actualBelowP20": 0.3607,
+        "actualAboveP80": 0.1148,
+        "actualAboveP90": 0.0656,
+        "p10ToP90Coverage": 0.7705,
+        "p20ToP80Coverage": 0.5246,
+        "meanPredictionBias": -3.8,
+        "medianAbsoluteError": 8.55,
+        "averagePinballLoss": 2.8,
+        "averageP10ToP90Width": 26.35
+      }
+    },
+    "10-30": {
+      "base": {
+        "starts": 132,
+        "actualBelowP10": 0.0606,
+        "actualBelowP20": 0.1894,
+        "actualAboveP80": 0.197,
+        "actualAboveP90": 0.1061,
+        "p10ToP90Coverage": 0.8333,
+        "p20ToP80Coverage": 0.6136,
+        "meanPredictionBias": 0.51,
+        "medianAbsoluteError": 6.66,
+        "averagePinballLoss": 2.47,
+        "averageP10ToP90Width": 25.33
+      },
+      "experienceAdjusted": {
+        "starts": 132,
+        "actualBelowP10": 0.0606,
+        "actualBelowP20": 0.1742,
+        "actualAboveP80": 0.1742,
+        "actualAboveP90": 0.0833,
+        "p10ToP90Coverage": 0.8561,
+        "p20ToP80Coverage": 0.6515,
+        "meanPredictionBias": 0.51,
+        "medianAbsoluteError": 6.59,
+        "averagePinballLoss": 2.48,
+        "averageP10ToP90Width": 26.35
+      }
+    },
+    "30-60": {
+      "base": {
+        "starts": 625,
+        "actualBelowP10": 0.0976,
+        "actualBelowP20": 0.2112,
+        "actualAboveP80": 0.2272,
+        "actualAboveP90": 0.1168,
+        "p10ToP90Coverage": 0.7856,
+        "p20ToP80Coverage": 0.5616,
+        "meanPredictionBias": 0.39,
+        "medianAbsoluteError": 7.08,
+        "averagePinballLoss": 2.66,
+        "averageP10ToP90Width": 25.14
+      },
+      "experienceAdjusted": {
+        "starts": 625,
+        "actualBelowP10": 0.0928,
+        "actualBelowP20": 0.2032,
+        "actualAboveP80": 0.2144,
+        "actualAboveP90": 0.1072,
+        "p10ToP90Coverage": 0.8,
+        "p20ToP80Coverage": 0.5824,
+        "meanPredictionBias": 0.39,
+        "medianAbsoluteError": 7.06,
+        "averagePinballLoss": 2.66,
+        "averageP10ToP90Width": 25.84
+      }
+    },
+    "60+": {
+      "base": {
+        "starts": 230,
+        "actualBelowP10": 0.1261,
+        "actualBelowP20": 0.2913,
+        "actualAboveP80": 0.1783,
+        "actualAboveP90": 0.113,
+        "p10ToP90Coverage": 0.7609,
+        "p20ToP80Coverage": 0.5304,
+        "meanPredictionBias": -0.7,
+        "medianAbsoluteError": 7.41,
+        "averagePinballLoss": 2.76,
+        "averageP10ToP90Width": 25.03
+      },
+      "experienceAdjusted": {
+        "starts": 230,
+        "actualBelowP10": 0.113,
+        "actualBelowP20": 0.2826,
+        "actualAboveP80": 0.1783,
+        "actualAboveP90": 0.1043,
+        "p10ToP90Coverage": 0.7826,
+        "p20ToP80Coverage": 0.5391,
+        "meanPredictionBias": -0.7,
+        "medianAbsoluteError": 7.44,
+        "averagePinballLoss": 2.76,
+        "averageP10ToP90Width": 25.64
+      }
+    }
+  },
+  "byExperienceConfidence": {
+    "low": {
+      "base": {
+        "starts": 93,
+        "actualBelowP10": 0.129,
+        "actualBelowP20": 0.2581,
+        "actualAboveP80": 0.172,
+        "actualAboveP90": 0.0753,
+        "p10ToP90Coverage": 0.7957,
+        "p20ToP80Coverage": 0.5699,
+        "meanPredictionBias": -1.55,
+        "medianAbsoluteError": 7.63,
+        "averagePinballLoss": 2.64,
+        "averageP10ToP90Width": 25.36
+      },
+      "experienceAdjusted": {
+        "starts": 93,
+        "actualBelowP10": 0.1183,
+        "actualBelowP20": 0.2366,
+        "actualAboveP80": 0.1398,
+        "actualAboveP90": 0.0645,
+        "p10ToP90Coverage": 0.8172,
+        "p20ToP80Coverage": 0.6237,
+        "meanPredictionBias": -1.55,
+        "medianAbsoluteError": 7.83,
+        "averagePinballLoss": 2.64,
+        "averageP10ToP90Width": 26.75
+      }
+    },
+    "medium": {
+      "base": {
+        "starts": 289,
+        "actualBelowP10": 0.0796,
+        "actualBelowP20": 0.2284,
+        "actualAboveP80": 0.2215,
+        "actualAboveP90": 0.1419,
+        "p10ToP90Coverage": 0.7785,
+        "p20ToP80Coverage": 0.5502,
+        "meanPredictionBias": 0.88,
+        "medianAbsoluteError": 7.19,
+        "averagePinballLoss": 2.67,
+        "averageP10ToP90Width": 25.18
+      },
+      "experienceAdjusted": {
+        "starts": 289,
+        "actualBelowP10": 0.0761,
+        "actualBelowP20": 0.2111,
+        "actualAboveP80": 0.2111,
+        "actualAboveP90": 0.1211,
+        "p10ToP90Coverage": 0.8028,
+        "p20ToP80Coverage": 0.5779,
+        "meanPredictionBias": 0.88,
+        "medianAbsoluteError": 7.15,
+        "averagePinballLoss": 2.67,
+        "averageP10ToP90Width": 26.08
+      }
+    },
+    "high": {
+      "base": {
+        "starts": 666,
+        "actualBelowP10": 0.1111,
+        "actualBelowP20": 0.2357,
+        "actualAboveP80": 0.2042,
+        "actualAboveP90": 0.1036,
+        "p10ToP90Coverage": 0.7853,
+        "p20ToP80Coverage": 0.5601,
+        "meanPredictionBias": -0.29,
+        "medianAbsoluteError": 7.16,
+        "averagePinballLoss": 2.67,
+        "averageP10ToP90Width": 25.09
+      },
+      "experienceAdjusted": {
+        "starts": 666,
+        "actualBelowP10": 0.1036,
+        "actualBelowP20": 0.2312,
+        "actualAboveP80": 0.1967,
+        "actualAboveP90": 0.0976,
+        "p10ToP90Coverage": 0.7988,
+        "p20ToP80Coverage": 0.5721,
+        "meanPredictionBias": -0.29,
+        "medianAbsoluteError": 7.17,
+        "averagePinballLoss": 2.67,
+        "averageP10ToP90Width": 25.69
+      }
+    },
+    "unknown": {
+      "base": {
+        "starts": 0
+      },
+      "experienceAdjusted": {
+        "starts": 0
+      }
+    }
+  }
+}

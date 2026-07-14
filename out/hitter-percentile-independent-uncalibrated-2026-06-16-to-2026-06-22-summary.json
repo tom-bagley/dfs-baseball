@@ -1,0 +1,373 @@
+{
+  "start": "2026-06-16",
+  "end": "2026-06-22",
+  "projectionSystem": "rSteamer",
+  "simulationsPerHitter": 10000,
+  "calibrationOffset": 0,
+  "gamesFound": 91,
+  "projectedHitterRows": 1638,
+  "matchedHitters": 1638,
+  "unmatchedOrMissingHitters": 0,
+  "metrics": {
+    "hitters": 1638,
+    "p10": {
+      "below": 0.0195,
+      "atOrBelow": 0.246
+    },
+    "p20": {
+      "below": 0.2063,
+      "atOrBelow": 0.3199
+    },
+    "p50": {
+      "below": 0.5354,
+      "atOrBelow": 0.6184
+    },
+    "p80": {
+      "below": 0.7937,
+      "atOrBelow": 0.8175
+    },
+    "p90": {
+      "below": 0.8822,
+      "atOrBelow": 0.9011
+    },
+    "actualAboveP80": 0.1825,
+    "actualAtOrAboveP80": 0.2063,
+    "actualAboveP90": 0.0989,
+    "actualAtOrAboveP90": 0.1178,
+    "p10ToP90Coverage": 0.8816,
+    "p20ToP80Coverage": 0.6111,
+    "meanPredictionBias": -0.56,
+    "meanSimulationDeltaFromProjection": -0.16,
+    "meanAbsoluteSimulationDeltaFromProjection": 0.16,
+    "medianErrorFromP50": -1,
+    "medianAbsoluteError": 4,
+    "averagePinballLoss": 1.73,
+    "averageP10ToP90Width": 16.19
+  },
+  "byLineupSlot": {
+    "1": {
+      "hitters": 182,
+      "p10": {
+        "below": 0.0549,
+        "atOrBelow": 0.1538
+      },
+      "p20": {
+        "below": 0.1648,
+        "atOrBelow": 0.2033
+      },
+      "p50": {
+        "below": 0.4725,
+        "atOrBelow": 0.5
+      },
+      "p80": {
+        "below": 0.7088,
+        "atOrBelow": 0.7308
+      },
+      "p90": {
+        "below": 0.8242,
+        "atOrBelow": 0.8407
+      },
+      "actualAboveP80": 0.2692,
+      "actualAtOrAboveP80": 0.2912,
+      "actualAboveP90": 0.1593,
+      "actualAtOrAboveP90": 0.1758,
+      "p10ToP90Coverage": 0.7857,
+      "p20ToP80Coverage": 0.5659,
+      "meanPredictionBias": 1.22,
+      "meanSimulationDeltaFromProjection": -0.17,
+      "meanAbsoluteSimulationDeltaFromProjection": 0.17,
+      "medianErrorFromP50": 0.5,
+      "medianAbsoluteError": 5,
+      "averagePinballLoss": 2.16,
+      "averageP10ToP90Width": 17.5
+    },
+    "2": {
+      "hitters": 182,
+      "p10": {
+        "below": 0.044,
+        "atOrBelow": 0.2143
+      },
+      "p20": {
+        "below": 0.2198,
+        "atOrBelow": 0.3077
+      },
+      "p50": {
+        "below": 0.533,
+        "atOrBelow": 0.6044
+      },
+      "p80": {
+        "below": 0.8077,
+        "atOrBelow": 0.8187
+      },
+      "p90": {
+        "below": 0.9011,
+        "atOrBelow": 0.9176
+      },
+      "actualAboveP80": 0.1813,
+      "actualAtOrAboveP80": 0.1923,
+      "actualAboveP90": 0.0824,
+      "actualAtOrAboveP90": 0.0989,
+      "p10ToP90Coverage": 0.8736,
+      "p20ToP80Coverage": 0.5989,
+      "meanPredictionBias": -0.94,
+      "meanSimulationDeltaFromProjection": -0.17,
+      "meanAbsoluteSimulationDeltaFromProjection": 0.17,
+      "medianErrorFromP50": -1,
+      "medianAbsoluteError": 5,
+      "averagePinballLoss": 1.79,
+      "averageP10ToP90Width": 17.7
+    },
+    "3": {
+      "hitters": 182,
+      "p10": {
+        "below": 0.033,
+        "atOrBelow": 0.1923
+      },
+      "p20": {
+        "below": 0.1978,
+        "atOrBelow": 0.2912
+      },
+      "p50": {
+        "below": 0.5879,
+        "atOrBelow": 0.6538
+      },
+      "p80": {
+        "below": 0.7967,
+        "atOrBelow": 0.8022
+      },
+      "p90": {
+        "below": 0.8516,
+        "atOrBelow": 0.8626
+      },
+      "actualAboveP80": 0.1978,
+      "actualAtOrAboveP80": 0.2033,
+      "actualAboveP90": 0.1374,
+      "actualAtOrAboveP90": 0.1484,
+      "p10ToP90Coverage": 0.8297,
+      "p20ToP80Coverage": 0.6044,
+      "meanPredictionBias": -0.31,
+      "meanSimulationDeltaFromProjection": -0.16,
+      "meanAbsoluteSimulationDeltaFromProjection": 0.16,
+      "medianErrorFromP50": -1.5,
+      "medianAbsoluteError": 4,
+      "averagePinballLoss": 2.05,
+      "averageP10ToP90Width": 17.51
+    },
+    "4": {
+      "hitters": 182,
+      "p10": {
+        "below": 0.0385,
+        "atOrBelow": 0.2692
+      },
+      "p20": {
+        "below": 0.2692,
+        "atOrBelow": 0.3571
+      },
+      "p50": {
+        "below": 0.5275,
+        "atOrBelow": 0.6264
+      },
+      "p80": {
+        "below": 0.8022,
+        "atOrBelow": 0.8352
+      },
+      "p90": {
+        "below": 0.9011,
+        "atOrBelow": 0.9121
+      },
+      "actualAboveP80": 0.1648,
+      "actualAtOrAboveP80": 0.1978,
+      "actualAboveP90": 0.0879,
+      "actualAtOrAboveP90": 0.0989,
+      "p10ToP90Coverage": 0.8736,
+      "p20ToP80Coverage": 0.5659,
+      "meanPredictionBias": -1.05,
+      "meanSimulationDeltaFromProjection": -0.15,
+      "meanAbsoluteSimulationDeltaFromProjection": 0.15,
+      "medianErrorFromP50": -1,
+      "medianAbsoluteError": 5,
+      "averagePinballLoss": 1.8,
+      "averageP10ToP90Width": 17.08
+    },
+    "5": {
+      "hitters": 182,
+      "p10": {
+        "below": 0,
+        "atOrBelow": 0.2527
+      },
+      "p20": {
+        "below": 0.2418,
+        "atOrBelow": 0.3407
+      },
+      "p50": {
+        "below": 0.5659,
+        "atOrBelow": 0.6484
+      },
+      "p80": {
+        "below": 0.8242,
+        "atOrBelow": 0.8462
+      },
+      "p90": {
+        "below": 0.8901,
+        "atOrBelow": 0.9121
+      },
+      "actualAboveP80": 0.1538,
+      "actualAtOrAboveP80": 0.1758,
+      "actualAboveP90": 0.0879,
+      "actualAtOrAboveP90": 0.1099,
+      "p10ToP90Coverage": 0.9121,
+      "p20ToP80Coverage": 0.6044,
+      "meanPredictionBias": -1.23,
+      "meanSimulationDeltaFromProjection": -0.17,
+      "meanAbsoluteSimulationDeltaFromProjection": 0.17,
+      "medianErrorFromP50": -1,
+      "medianAbsoluteError": 4,
+      "averagePinballLoss": 1.61,
+      "averageP10ToP90Width": 16.34
+    },
+    "6": {
+      "hitters": 182,
+      "p10": {
+        "below": 0,
+        "atOrBelow": 0.2033
+      },
+      "p20": {
+        "below": 0.1978,
+        "atOrBelow": 0.2802
+      },
+      "p50": {
+        "below": 0.4835,
+        "atOrBelow": 0.5934
+      },
+      "p80": {
+        "below": 0.8022,
+        "atOrBelow": 0.8187
+      },
+      "p90": {
+        "below": 0.9011,
+        "atOrBelow": 0.9286
+      },
+      "actualAboveP80": 0.1813,
+      "actualAtOrAboveP80": 0.1978,
+      "actualAboveP90": 0.0714,
+      "actualAtOrAboveP90": 0.0989,
+      "p10ToP90Coverage": 0.9286,
+      "p20ToP80Coverage": 0.6209,
+      "meanPredictionBias": -0.55,
+      "meanSimulationDeltaFromProjection": -0.16,
+      "meanAbsoluteSimulationDeltaFromProjection": 0.16,
+      "medianErrorFromP50": 0,
+      "medianAbsoluteError": 3,
+      "averagePinballLoss": 1.52,
+      "averageP10ToP90Width": 15.74
+    },
+    "7": {
+      "hitters": 182,
+      "p10": {
+        "below": 0,
+        "atOrBelow": 0.3242
+      },
+      "p20": {
+        "below": 0.2692,
+        "atOrBelow": 0.3736
+      },
+      "p50": {
+        "below": 0.5549,
+        "atOrBelow": 0.6648
+      },
+      "p80": {
+        "below": 0.7967,
+        "atOrBelow": 0.8187
+      },
+      "p90": {
+        "below": 0.8901,
+        "atOrBelow": 0.9011
+      },
+      "actualAboveP80": 0.1813,
+      "actualAtOrAboveP80": 0.2033,
+      "actualAboveP90": 0.0989,
+      "actualAtOrAboveP90": 0.1099,
+      "p10ToP90Coverage": 0.9011,
+      "p20ToP80Coverage": 0.5495,
+      "meanPredictionBias": -0.76,
+      "meanSimulationDeltaFromProjection": -0.15,
+      "meanAbsoluteSimulationDeltaFromProjection": 0.15,
+      "medianErrorFromP50": -1,
+      "medianAbsoluteError": 5,
+      "averagePinballLoss": 1.67,
+      "averageP10ToP90Width": 15.27
+    },
+    "8": {
+      "hitters": 182,
+      "p10": {
+        "below": 0.0055,
+        "atOrBelow": 0.2857
+      },
+      "p20": {
+        "below": 0.1593,
+        "atOrBelow": 0.3462
+      },
+      "p50": {
+        "below": 0.5769,
+        "atOrBelow": 0.6703
+      },
+      "p80": {
+        "below": 0.8077,
+        "atOrBelow": 0.8462
+      },
+      "p90": {
+        "below": 0.9066,
+        "atOrBelow": 0.9341
+      },
+      "actualAboveP80": 0.1538,
+      "actualAtOrAboveP80": 0.1923,
+      "actualAboveP90": 0.0659,
+      "actualAtOrAboveP90": 0.0934,
+      "p10ToP90Coverage": 0.9286,
+      "p20ToP80Coverage": 0.6868,
+      "meanPredictionBias": -0.88,
+      "meanSimulationDeltaFromProjection": -0.16,
+      "meanAbsoluteSimulationDeltaFromProjection": 0.16,
+      "medianErrorFromP50": -2,
+      "medianAbsoluteError": 4,
+      "averagePinballLoss": 1.49,
+      "averageP10ToP90Width": 14.46
+    },
+    "9": {
+      "hitters": 182,
+      "p10": {
+        "below": 0,
+        "atOrBelow": 0.3187
+      },
+      "p20": {
+        "below": 0.1374,
+        "atOrBelow": 0.3791
+      },
+      "p50": {
+        "below": 0.5165,
+        "atOrBelow": 0.6044
+      },
+      "p80": {
+        "below": 0.7967,
+        "atOrBelow": 0.8407
+      },
+      "p90": {
+        "below": 0.8736,
+        "atOrBelow": 0.9011
+      },
+      "actualAboveP80": 0.1593,
+      "actualAtOrAboveP80": 0.2033,
+      "actualAboveP90": 0.0989,
+      "actualAtOrAboveP90": 0.1264,
+      "p10ToP90Coverage": 0.9011,
+      "p20ToP80Coverage": 0.7033,
+      "meanPredictionBias": -0.59,
+      "meanSimulationDeltaFromProjection": -0.15,
+      "meanAbsoluteSimulationDeltaFromProjection": 0.15,
+      "medianErrorFromP50": -1,
+      "medianAbsoluteError": 4,
+      "averagePinballLoss": 1.48,
+      "averageP10ToP90Width": 14.1
+    }
+  }
+}

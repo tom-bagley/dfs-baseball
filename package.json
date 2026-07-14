@@ -10,7 +10,11 @@
     "export": "node src/export-fangraphs-sim.js",
     "export:players": "node src/export-fangraphs-players.js",
     "backtest:moneylines": "node src/backtest-fangraphs-moneylines.js",
-    "backtest:calibration": "node src/backtest-projection-calibration.js"
+    "backtest:calibration": "node src/backtest-projection-calibration.js",
+    "backtest:pitchers": "node src/backtest-pitcher-percentiles.js",
+    "backtest:hitters": "node src/backtest-hitter-percentiles.js",
+    "test:pitchers": "node src/test-pitcher-outcome-sim.js",
+    "test:hitters": "node src/test-hitter-outcome-sim.js"
   },
   "dependencies": {},
   "devDependencies": {}

@@ -1,0 +1,504 @@
+{
+  "input": "C:\\Users\\tomba\\work application folder\\dfs baseball\\out\\hitter-direct-projections-2026-05-04-to-2026-07-12-hitters.csv",
+  "design": {
+    "holdoutStart": "2026-07-02",
+    "developmentDates": [
+      "2026-06-16",
+      "2026-06-17",
+      "2026-06-18",
+      "2026-06-19",
+      "2026-06-20",
+      "2026-06-21",
+      "2026-06-22",
+      "2026-06-23",
+      "2026-06-30"
+    ],
+    "rollingValidationDates": [
+      "2026-06-19",
+      "2026-06-20",
+      "2026-06-21",
+      "2026-06-22",
+      "2026-06-23",
+      "2026-06-30"
+    ],
+    "holdoutDates": [
+      "2026-07-02",
+      "2026-07-06",
+      "2026-07-07",
+      "2026-07-08",
+      "2026-07-09",
+      "2026-07-10",
+      "2026-07-11",
+      "2026-07-12"
+    ],
+    "developmentHitters": 2052,
+    "holdoutHitters": 1908,
+    "candidateModels": 144,
+    "selectionMetric": "lowest rolling-validation RMSE, then MAE",
+    "leakageControl": "Every validation prediction uses earlier dates only; the final model is frozen before the holdout starts."
+  },
+  "selectedModel": {
+    "featureSet": "offset",
+    "ridge": 25,
+    "halfLifeDays": 35,
+    "playerPriorGames": 20,
+    "coefficients": {
+      "intercept": -0.5534
+    },
+    "learnedPlayerEffects": 422
+  },
+  "rollingValidation": {
+    "baseline": {
+      "hitters": 1386,
+      "averageProjection": 7.68,
+      "averageActual": 7.12,
+      "biasActualMinusProjection": -0.56,
+      "meanAbsoluteError": 5.79,
+      "medianAbsoluteError": 5.21,
+      "rootMeanSquaredError": 7.37,
+      "correlation": 0.1784
+    },
+    "bayesian": {
+      "hitters": 1386,
+      "averageProjection": 7.24,
+      "averageActual": 7.12,
+      "biasActualMinusProjection": -0.11,
+      "meanAbsoluteError": 5.65,
+      "medianAbsoluteError": 4.94,
+      "rootMeanSquaredError": 7.36,
+      "correlation": 0.1757
+    },
+    "improvement": {
+      "meanAbsoluteError": 0.14,
+      "meanAbsoluteErrorPercent": 2.42,
+      "rootMeanSquaredError": 0.01,
+      "rootMeanSquaredErrorPercent": 0.14,
+      "correlation": -0.0027
+    }
+  },
+  "untouchedHoldout": {
+    "baseline": {
+      "hitters": 1908,
+      "averageProjection": 7.72,
+      "averageActual": 6.96,
+      "biasActualMinusProjection": -0.76,
+      "meanAbsoluteError": 5.77,
+      "medianAbsoluteError": 5.45,
+      "rootMeanSquaredError": 7.26,
+      "correlation": 0.1194
+    },
+    "bayesian": {
+      "hitters": 1908,
+      "averageProjection": 7.22,
+      "averageActual": 6.96,
+      "biasActualMinusProjection": -0.26,
+      "meanAbsoluteError": 5.65,
+      "medianAbsoluteError": 5.15,
+      "rootMeanSquaredError": 7.27,
+      "correlation": 0.0986
+    },
+    "improvement": {
+      "meanAbsoluteError": 0.12,
+      "meanAbsoluteErrorPercent": 2.08,
+      "rootMeanSquaredError": -0.01,
+      "rootMeanSquaredErrorPercent": -0.14,
+      "correlation": -0.0208
+    }
+  },
+  "holdoutByDate": {
+    "2026-07-02": {
+      "baseline": {
+        "hitters": 162,
+        "averageProjection": 7.98,
+        "averageActual": 8.03,
+        "biasActualMinusProjection": 0.05,
+        "meanAbsoluteError": 5.95,
+        "medianAbsoluteError": 5.7,
+        "rootMeanSquaredError": 7.28,
+        "correlation": 0.0934
+      },
+      "bayesian": {
+        "hitters": 162,
+        "averageProjection": 7.48,
+        "averageActual": 8.03,
+        "biasActualMinusProjection": 0.55,
+        "meanAbsoluteError": 5.91,
+        "medianAbsoluteError": 5.59,
+        "rootMeanSquaredError": 7.4,
+        "correlation": 0.0467
+      },
+      "improvement": {
+        "meanAbsoluteError": 0.04,
+        "meanAbsoluteErrorPercent": 0.67,
+        "rootMeanSquaredError": -0.12,
+        "rootMeanSquaredErrorPercent": -1.65,
+        "correlation": -0.0467
+      }
+    },
+    "2026-07-06": {
+      "baseline": {
+        "hitters": 144,
+        "averageProjection": 7.77,
+        "averageActual": 8.32,
+        "biasActualMinusProjection": 0.55,
+        "meanAbsoluteError": 6.53,
+        "medianAbsoluteError": 5.25,
+        "rootMeanSquaredError": 8.85,
+        "correlation": 0.1807
+      },
+      "bayesian": {
+        "hitters": 144,
+        "averageProjection": 7.27,
+        "averageActual": 8.32,
+        "biasActualMinusProjection": 1.05,
+        "meanAbsoluteError": 6.43,
+        "medianAbsoluteError": 5.03,
+        "rootMeanSquaredError": 8.94,
+        "correlation": 0.1473
+      },
+      "improvement": {
+        "meanAbsoluteError": 0.1,
+        "meanAbsoluteErrorPercent": 1.53,
+        "rootMeanSquaredError": -0.09,
+        "rootMeanSquaredErrorPercent": -1.02,
+        "correlation": -0.0334
+      }
+    },
+    "2026-07-07": {
+      "baseline": {
+        "hitters": 288,
+        "averageProjection": 7.56,
+        "averageActual": 7.11,
+        "biasActualMinusProjection": -0.45,
+        "meanAbsoluteError": 5.57,
+        "medianAbsoluteError": 4.9,
+        "rootMeanSquaredError": 7.5,
+        "correlation": 0.0503
+      },
+      "bayesian": {
+        "hitters": 288,
+        "averageProjection": 7.06,
+        "averageActual": 7.11,
+        "biasActualMinusProjection": 0.05,
+        "meanAbsoluteError": 5.49,
+        "medianAbsoluteError": 4.85,
+        "rootMeanSquaredError": 7.53,
+        "correlation": 0.0303
+      },
+      "improvement": {
+        "meanAbsoluteError": 0.08,
+        "meanAbsoluteErrorPercent": 1.44,
+        "rootMeanSquaredError": -0.03,
+        "rootMeanSquaredErrorPercent": -0.4,
+        "correlation": -0.02
+      }
+    },
+    "2026-07-08": {
+      "baseline": {
+        "hitters": 270,
+        "averageProjection": 7.77,
+        "averageActual": 6.61,
+        "biasActualMinusProjection": -1.16,
+        "meanAbsoluteError": 5.73,
+        "medianAbsoluteError": 5.42,
+        "rootMeanSquaredError": 7.16,
+        "correlation": 0.1752
+      },
+      "bayesian": {
+        "hitters": 270,
+        "averageProjection": 7.27,
+        "averageActual": 6.61,
+        "biasActualMinusProjection": -0.66,
+        "meanAbsoluteError": 5.53,
+        "medianAbsoluteError": 5.09,
+        "rootMeanSquaredError": 7.08,
+        "correlation": 0.1887
+      },
+      "improvement": {
+        "meanAbsoluteError": 0.2,
+        "meanAbsoluteErrorPercent": 3.49,
+        "rootMeanSquaredError": 0.08,
+        "rootMeanSquaredErrorPercent": 1.12,
+        "correlation": 0.0135
+      }
+    },
+    "2026-07-09": {
+      "baseline": {
+        "hitters": 234,
+        "averageProjection": 7.72,
+        "averageActual": 6.85,
+        "biasActualMinusProjection": -0.87,
+        "meanAbsoluteError": 6.03,
+        "medianAbsoluteError": 5.53,
+        "rootMeanSquaredError": 7.38,
+        "correlation": 0.1195
+      },
+      "bayesian": {
+        "hitters": 234,
+        "averageProjection": 7.24,
+        "averageActual": 6.85,
+        "biasActualMinusProjection": -0.39,
+        "meanAbsoluteError": 5.89,
+        "medianAbsoluteError": 5.23,
+        "rootMeanSquaredError": 7.36,
+        "correlation": 0.1122
+      },
+      "improvement": {
+        "meanAbsoluteError": 0.14,
+        "meanAbsoluteErrorPercent": 2.32,
+        "rootMeanSquaredError": 0.02,
+        "rootMeanSquaredErrorPercent": 0.27,
+        "correlation": -0.0073
+      }
+    },
+    "2026-07-10": {
+      "baseline": {
+        "hitters": 252,
+        "averageProjection": 7.79,
+        "averageActual": 6.97,
+        "biasActualMinusProjection": -0.82,
+        "meanAbsoluteError": 5.92,
+        "medianAbsoluteError": 5.82,
+        "rootMeanSquaredError": 7.22,
+        "correlation": 0.1334
+      },
+      "bayesian": {
+        "hitters": 252,
+        "averageProjection": 7.28,
+        "averageActual": 6.97,
+        "biasActualMinusProjection": -0.31,
+        "meanAbsoluteError": 5.84,
+        "medianAbsoluteError": 5.5,
+        "rootMeanSquaredError": 7.26,
+        "correlation": 0.0929
+      },
+      "improvement": {
+        "meanAbsoluteError": 0.08,
+        "meanAbsoluteErrorPercent": 1.35,
+        "rootMeanSquaredError": -0.04,
+        "rootMeanSquaredErrorPercent": -0.55,
+        "correlation": -0.0405
+      }
+    },
+    "2026-07-11": {
+      "baseline": {
+        "hitters": 288,
+        "averageProjection": 7.64,
+        "averageActual": 6.57,
+        "biasActualMinusProjection": -1.08,
+        "meanAbsoluteError": 5.79,
+        "medianAbsoluteError": 5.55,
+        "rootMeanSquaredError": 7.14,
+        "correlation": 0.0253
+      },
+      "bayesian": {
+        "hitters": 288,
+        "averageProjection": 7.13,
+        "averageActual": 6.57,
+        "biasActualMinusProjection": -0.57,
+        "meanAbsoluteError": 5.66,
+        "medianAbsoluteError": 5.19,
+        "rootMeanSquaredError": 7.13,
+        "correlation": 0.0121
+      },
+      "improvement": {
+        "meanAbsoluteError": 0.13,
+        "meanAbsoluteErrorPercent": 2.25,
+        "rootMeanSquaredError": 0.01,
+        "rootMeanSquaredErrorPercent": 0.14,
+        "correlation": -0.0132
+      }
+    },
+    "2026-07-12": {
+      "baseline": {
+        "hitters": 270,
+        "averageProjection": 7.68,
+        "averageActual": 6.32,
+        "biasActualMinusProjection": -1.36,
+        "meanAbsoluteError": 5.13,
+        "medianAbsoluteError": 5.18,
+        "rootMeanSquaredError": 6.15,
+        "correlation": 0.1887
+      },
+      "bayesian": {
+        "hitters": 270,
+        "averageProjection": 7.18,
+        "averageActual": 6.32,
+        "biasActualMinusProjection": -0.86,
+        "meanAbsoluteError": 4.99,
+        "medianAbsoluteError": 4.81,
+        "rootMeanSquaredError": 6.11,
+        "correlation": 0.1615
+      },
+      "improvement": {
+        "meanAbsoluteError": 0.14,
+        "meanAbsoluteErrorPercent": 2.73,
+        "rootMeanSquaredError": 0.04,
+        "rootMeanSquaredErrorPercent": 0.65,
+        "correlation": -0.0272
+      }
+    }
+  },
+  "topCandidates": [
+    {
+      "featureSet": "offset",
+      "ridge": 25,
+      "halfLifeDays": 35,
+      "playerPriorGames": 20,
+      "rollingValidationMetrics": {
+        "hitters": 1386,
+        "averageProjection": 7.24,
+        "averageActual": 7.12,
+        "biasActualMinusProjection": -0.11,
+        "meanAbsoluteError": 5.65,
+        "medianAbsoluteError": 4.94,
+        "rootMeanSquaredError": 7.36,
+        "correlation": 0.1757
+      }
+    },
+    {
+      "featureSet": "offset",
+      "ridge": 25,
+      "halfLifeDays": "none",
+      "playerPriorGames": 20,
+      "rollingValidationMetrics": {
+        "hitters": 1386,
+        "averageProjection": 7.24,
+        "averageActual": 7.12,
+        "biasActualMinusProjection": -0.11,
+        "meanAbsoluteError": 5.65,
+        "medianAbsoluteError": 4.95,
+        "rootMeanSquaredError": 7.36,
+        "correlation": 0.1755
+      }
+    },
+    {
+      "featureSet": "nonlinear",
+      "ridge": 25,
+      "halfLifeDays": 14,
+      "playerPriorGames": 20,
+      "rollingValidationMetrics": {
+        "hitters": 1386,
+        "averageProjection": 7.22,
+        "averageActual": 7.12,
+        "biasActualMinusProjection": -0.1,
+        "meanAbsoluteError": 5.65,
+        "medianAbsoluteError": 4.87,
+        "rootMeanSquaredError": 7.36,
+        "correlation": 0.1742
+      }
+    },
+    {
+      "featureSet": "nonlinear",
+      "ridge": 25,
+      "halfLifeDays": 35,
+      "playerPriorGames": 20,
+      "rollingValidationMetrics": {
+        "hitters": 1386,
+        "averageProjection": 7.22,
+        "averageActual": 7.12,
+        "biasActualMinusProjection": -0.1,
+        "meanAbsoluteError": 5.65,
+        "medianAbsoluteError": 4.85,
+        "rootMeanSquaredError": 7.36,
+        "correlation": 0.1749
+      }
+    },
+    {
+      "featureSet": "nonlinear",
+      "ridge": 25,
+      "halfLifeDays": "none",
+      "playerPriorGames": 20,
+      "rollingValidationMetrics": {
+        "hitters": 1386,
+        "averageProjection": 7.22,
+        "averageActual": 7.12,
+        "biasActualMinusProjection": -0.1,
+        "meanAbsoluteError": 5.65,
+        "medianAbsoluteError": 4.84,
+        "rootMeanSquaredError": 7.36,
+        "correlation": 0.1751
+      }
+    },
+    {
+      "featureSet": "offset",
+      "ridge": 25,
+      "halfLifeDays": 14,
+      "playerPriorGames": "none",
+      "rollingValidationMetrics": {
+        "hitters": 1386,
+        "averageProjection": 7.2,
+        "averageActual": 7.12,
+        "biasActualMinusProjection": -0.08,
+        "meanAbsoluteError": 5.66,
+        "medianAbsoluteError": 5.03,
+        "rootMeanSquaredError": 7.36,
+        "correlation": 0.1704
+      }
+    },
+    {
+      "featureSet": "offset",
+      "ridge": 25,
+      "halfLifeDays": 35,
+      "playerPriorGames": "none",
+      "rollingValidationMetrics": {
+        "hitters": 1386,
+        "averageProjection": 7.19,
+        "averageActual": 7.12,
+        "biasActualMinusProjection": -0.07,
+        "meanAbsoluteError": 5.66,
+        "medianAbsoluteError": 5.02,
+        "rootMeanSquaredError": 7.36,
+        "correlation": 0.1709
+      }
+    },
+    {
+      "featureSet": "offset",
+      "ridge": 25,
+      "halfLifeDays": "none",
+      "playerPriorGames": "none",
+      "rollingValidationMetrics": {
+        "hitters": 1386,
+        "averageProjection": 7.19,
+        "averageActual": 7.12,
+        "biasActualMinusProjection": -0.07,
+        "meanAbsoluteError": 5.66,
+        "medianAbsoluteError": 5.01,
+        "rootMeanSquaredError": 7.36,
+        "correlation": 0.1712
+      }
+    },
+    {
+      "featureSet": "offset",
+      "ridge": 25,
+      "halfLifeDays": 14,
+      "playerPriorGames": 20,
+      "rollingValidationMetrics": {
+        "hitters": 1386,
+        "averageProjection": 7.24,
+        "averageActual": 7.12,
+        "biasActualMinusProjection": -0.11,
+        "meanAbsoluteError": 5.66,
+        "medianAbsoluteError": 4.95,
+        "rootMeanSquaredError": 7.36,
+        "correlation": 0.1756
+      }
+    },
+    {
+      "featureSet": "offset",
+      "ridge": 100,
+      "halfLifeDays": 14,
+      "playerPriorGames": 20,
+      "rollingValidationMetrics": {
+        "hitters": 1386,
+        "averageProjection": 7.27,
+        "averageActual": 7.12,
+        "biasActualMinusProjection": -0.15,
+        "meanAbsoluteError": 5.66,
+        "medianAbsoluteError": 4.95,
+        "rootMeanSquaredError": 7.36,
+        "correlation": 0.1763
+      }
+    }
+  ]
+}

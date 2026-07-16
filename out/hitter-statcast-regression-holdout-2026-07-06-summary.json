@@ -1,0 +1,208 @@
+{
+  "design": {
+    "holdoutStart": "2026-07-06",
+    "developmentDates": [
+      "2026-06-16",
+      "2026-06-17",
+      "2026-06-18",
+      "2026-06-19",
+      "2026-06-20",
+      "2026-06-21",
+      "2026-06-22",
+      "2026-06-23",
+      "2026-06-30",
+      "2026-07-02"
+    ],
+    "validationDates": [
+      "2026-06-19",
+      "2026-06-20",
+      "2026-06-21",
+      "2026-06-22",
+      "2026-06-23",
+      "2026-06-30",
+      "2026-07-02"
+    ],
+    "holdoutHitters": 1746,
+    "candidates": 64
+  },
+  "errorSelectedModel": {
+    "featureSet": "contact",
+    "ridge": 640,
+    "reliabilityPA": 50,
+    "coefficients": {
+      "averageExitVelocity": 0.036766,
+      "hardHitRate": -0.018709,
+      "barrelRate": -0.155991,
+      "launchAngleQuality": -0.327055
+    },
+    "validationRmse": 7.3636,
+    "validationDailyCorrelation": 0.1554
+  },
+  "rankingSelectedModel": {
+    "featureSet": "xwoba",
+    "ridge": 640,
+    "reliabilityPA": 400,
+    "coefficients": {
+      "seasonXwobaDifference": 0.027178,
+      "recentXwobaDifference": 0.032181
+    },
+    "validationRmse": 7.3639,
+    "validationDailyCorrelation": 0.1582
+  },
+  "errorSelectedHoldout": {
+    "baseline": {
+      "hitters": 1746,
+      "averageProjection": 7.7,
+      "averageActual": 6.87,
+      "biasActualMinusProjection": -0.83,
+      "meanAbsoluteError": 5.76,
+      "medianAbsoluteError": 5.41,
+      "rootMeanSquaredError": 7.26,
+      "correlation": 0.1199
+    },
+    "model": {
+      "hitters": 1746,
+      "averageProjection": 7.48,
+      "averageActual": 6.87,
+      "biasActualMinusProjection": -0.62,
+      "meanAbsoluteError": 5.69,
+      "medianAbsoluteError": 5.33,
+      "rootMeanSquaredError": 7.24,
+      "correlation": 0.1201
+    },
+    "improvement": {
+      "mae": 0.07,
+      "rmse": 0.02,
+      "correlation": 0.0002
+    }
+  },
+  "rankingSelectedHoldout": {
+    "baseline": {
+      "hitters": 1746,
+      "averageProjection": 7.7,
+      "averageActual": 6.87,
+      "biasActualMinusProjection": -0.83,
+      "meanAbsoluteError": 5.76,
+      "medianAbsoluteError": 5.41,
+      "rootMeanSquaredError": 7.26,
+      "correlation": 0.1199
+    },
+    "model": {
+      "hitters": 1746,
+      "averageProjection": 7.7,
+      "averageActual": 6.87,
+      "biasActualMinusProjection": -0.83,
+      "meanAbsoluteError": 5.76,
+      "medianAbsoluteError": 5.41,
+      "rootMeanSquaredError": 7.26,
+      "correlation": 0.1201
+    },
+    "improvement": {
+      "mae": 0,
+      "rmse": 0,
+      "correlation": 0.0002
+    },
+    "baselineRanking": {
+      "meanDailyCorrelation": 0.1247,
+      "meanTop10PercentActual": 9.48
+    },
+    "modelRanking": {
+      "meanDailyCorrelation": 0.1249,
+      "meanTop10PercentActual": 9.58
+    }
+  },
+  "jordanWalker": {
+    "baseline": {
+      "hitters": 8,
+      "averageProjection": 8.02,
+      "averageActual": 11.13,
+      "biasActualMinusProjection": 3.1,
+      "meanAbsoluteError": 5.9,
+      "medianAbsoluteError": 5.22,
+      "rootMeanSquaredError": 6.87,
+      "correlation": -0.4171
+    },
+    "model": {
+      "hitters": 8,
+      "averageProjection": 8.03,
+      "averageActual": 11.13,
+      "biasActualMinusProjection": 3.09,
+      "meanAbsoluteError": 5.9,
+      "medianAbsoluteError": 5.22,
+      "rootMeanSquaredError": 6.86,
+      "correlation": -0.4152
+    }
+  },
+  "topRankingCandidates": [
+    {
+      "featureSet": "xwoba",
+      "ridge": 640,
+      "reliabilityPA": 400,
+      "validationRmse": 7.3639,
+      "validationDailyCorrelation": 0.1582
+    },
+    {
+      "featureSet": "xwoba",
+      "ridge": 640,
+      "reliabilityPA": 200,
+      "validationRmse": 7.3644,
+      "validationDailyCorrelation": 0.1579
+    },
+    {
+      "featureSet": "xwoba",
+      "ridge": 160,
+      "reliabilityPA": 400,
+      "validationRmse": 7.365,
+      "validationDailyCorrelation": 0.1575
+    },
+    {
+      "featureSet": "xwoba",
+      "ridge": 640,
+      "reliabilityPA": 100,
+      "validationRmse": 7.365,
+      "validationDailyCorrelation": 0.1575
+    },
+    {
+      "featureSet": "xwoba",
+      "ridge": 640,
+      "reliabilityPA": 50,
+      "validationRmse": 7.3656,
+      "validationDailyCorrelation": 0.1572
+    },
+    {
+      "featureSet": "contact",
+      "ridge": 640,
+      "reliabilityPA": 400,
+      "validationRmse": 7.3642,
+      "validationDailyCorrelation": 0.1571
+    },
+    {
+      "featureSet": "xwoba-contact",
+      "ridge": 640,
+      "reliabilityPA": 400,
+      "validationRmse": 7.3646,
+      "validationDailyCorrelation": 0.1568
+    },
+    {
+      "featureSet": "xwoba",
+      "ridge": 160,
+      "reliabilityPA": 200,
+      "validationRmse": 7.3664,
+      "validationDailyCorrelation": 0.1567
+    },
+    {
+      "featureSet": "xwoba-contact-bat",
+      "ridge": 640,
+      "reliabilityPA": 400,
+      "validationRmse": 7.365,
+      "validationDailyCorrelation": 0.1566
+    },
+    {
+      "featureSet": "contact",
+      "ridge": 640,
+      "reliabilityPA": 200,
+      "validationRmse": 7.3645,
+      "validationDailyCorrelation": 0.1562
+    }
+  ]
+}

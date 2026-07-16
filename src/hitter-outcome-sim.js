@@ -8,6 +8,7 @@ export function simulateHitterOutcomes({
   histograms = {},
   simulations = DEFAULT_SIMULATIONS,
   calibrationOffset = DEFAULT_CALIBRATION_OFFSET,
+  targetMean = null,
 } = {}) {
   const count = Math.max(1000, Math.floor(Number(simulations) || DEFAULT_SIMULATIONS));
   const random = mulberry32(hashString(`${date}|${playerId}|${count}|hitter-outcomes-v1`));
@@ -63,6 +64,19 @@ export function simulateHitterOutcomes({
     scoreSum += score;
   }
 
+  const rawSimulationMean = scoreSum / count;
+  const hasTargetMean = targetMean !== null && targetMean !== undefined && targetMean !== '';
+  const requestedTargetMean = Number(targetMean);
+  const calibrationScale = hasTargetMean && Number.isFinite(requestedTargetMean) && requestedTargetMean >= 0 && rawSimulationMean > 0
+    ? requestedTargetMean / rawSimulationMean
+    : 1;
+  if (calibrationScale !== 1) {
+    scoreSum = 0;
+    for (let index = 0; index < scores.length; index += 1) {
+      scores[index] *= calibrationScale;
+      scoreSum += scores[index];
+    }
+  }
   scores.sort();
   const simulationMean = scoreSum / count;
   let squaredError = 0;
@@ -73,6 +87,7 @@ export function simulateHitterOutcomes({
     simulationMean: round(simulationMean),
     simulationStdDev: round(Math.sqrt(squaredError / count)),
     calibrationOffset: round(Number(calibrationOffset || 0)),
+    calibrationScale: round(calibrationScale, 4),
     p10: round(quantileSorted(scores, 0.10)),
     p20: round(quantileSorted(scores, 0.20)),
     p50: round(quantileSorted(scores, 0.50)),

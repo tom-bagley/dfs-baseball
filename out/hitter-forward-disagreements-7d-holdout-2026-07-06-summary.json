@@ -1,0 +1,271 @@
+{
+  "design": {
+    "horizonDays": 7,
+    "holdoutStart": "2026-07-06",
+    "developmentDates": [
+      "2026-06-16",
+      "2026-06-17",
+      "2026-06-18",
+      "2026-06-19",
+      "2026-06-20",
+      "2026-06-21",
+      "2026-06-22",
+      "2026-06-23",
+      "2026-06-30",
+      "2026-07-02"
+    ],
+    "validationDates": [
+      "2026-06-23",
+      "2026-06-30",
+      "2026-07-02"
+    ],
+    "anchors": 2092,
+    "trainingAnchors": 1587,
+    "holdoutAnchors": 129,
+    "minimumFuturePlateAppearances": 12,
+    "lastHistoryDate": "2026-07-12",
+    "completeThroughExclusive": "2026-07-13",
+    "leakageControl": "A training target is used only when its entire forward horizon ends on or before the prediction date."
+  },
+  "errorSelectedModel": {
+    "featureSet": "xwoba",
+    "ridge": 1,
+    "reliabilityPA": 400,
+    "maxAdjustmentRate": 0.25,
+    "validationWeightedRmse": 0.732,
+    "validationCorrelation": 0.2239,
+    "coefficients": {
+      "seasonXwobaDifference": 0.246244,
+      "recentXwobaDifference": -0.021526
+    }
+  },
+  "rankingSelectedModel": {
+    "featureSet": "xwoba",
+    "ridge": 1,
+    "reliabilityPA": 400,
+    "maxAdjustmentRate": 0.25,
+    "validationWeightedRmse": 0.732,
+    "validationCorrelation": 0.2239,
+    "coefficients": {
+      "seasonXwobaDifference": 0.246244,
+      "recentXwobaDifference": -0.021526
+    }
+  },
+  "holdout": {
+    "baseline": {
+      "players": 129,
+      "plateAppearances": 3231,
+      "weightedMae": 0.634,
+      "weightedRmse": 0.7829,
+      "correlation": 0.091,
+      "top20PercentActualRate": 1.6983
+    },
+    "errorSelected": {
+      "players": 129,
+      "plateAppearances": 3231,
+      "weightedMae": 0.6302,
+      "weightedRmse": 0.7772,
+      "correlation": 0.1087,
+      "top20PercentActualRate": 1.7485
+    },
+    "rankingSelected": {
+      "players": 129,
+      "plateAppearances": 3231,
+      "weightedMae": 0.6302,
+      "weightedRmse": 0.7772,
+      "correlation": 0.1087,
+      "top20PercentActualRate": 1.7485
+    },
+    "largestDisagreements": {
+      "cutoff": 0.0323,
+      "count": 27,
+      "baseline": {
+        "players": 27,
+        "plateAppearances": 726,
+        "weightedMae": 0.6365,
+        "weightedRmse": 0.774,
+        "correlation": -0.2167,
+        "top20PercentActualRate": 1.4034
+      },
+      "rankingSelected": {
+        "players": 27,
+        "plateAppearances": 726,
+        "weightedMae": 0.618,
+        "weightedRmse": 0.7543,
+        "correlation": -0.2191,
+        "top20PercentActualRate": 1.435
+      },
+      "directionAccuracy": 0.6667
+    }
+  },
+  "jordanWalker": [
+    {
+      "date": "2026-07-06",
+      "mlbGameId": "823036",
+      "simFile": "823036",
+      "simLoadDate": "2026-07-06T23:04:03",
+      "side": "home",
+      "team": "St. Louis Cardinals",
+      "opponent": "Milwaukee Brewers",
+      "lineupSlot": 3,
+      "fangraphsPlayerId": "27475",
+      "projectedPlayerName": "Jordan Walker",
+      "mlbPlayerId": "691023",
+      "actualPlayerName": "Jordan Walker",
+      "playerMatched": "true",
+      "projectedDraftKingsPoints": 8.55,
+      "actualDraftKingsPoints": 4,
+      "projectedPlateAppearances": 4.447,
+      "projectedSingles": 0.6474,
+      "projectedDoubles": 0.2157,
+      "projectedTriples": 0.0052,
+      "projectedHomeRuns": 0.1767,
+      "projectedRuns": 0.5462,
+      "projectedRunsBattedIn": 0.611,
+      "projectedWalks": 0.4327,
+      "projectedHitByPitch": 0.027,
+      "projectedStolenBases": 0.0976,
+      "actualSingles": 0,
+      "actualDoubles": 0,
+      "actualTriples": 0,
+      "actualHomeRuns": 0,
+      "actualRuns": 0,
+      "actualRunsBattedIn": 0,
+      "actualWalks": 2,
+      "actualHitByPitch": 0,
+      "actualStolenBases": 0,
+      "actualPlateAppearances": "4",
+      "error": "",
+      "projectedWoba": 0.34354117382505056,
+      "seasonPlateAppearances": 364,
+      "seasonBattedBalls": 239,
+      "seasonAverageExitVelocity": 93.88744769874478,
+      "seasonAverageLaunchAngle": 11.96234309623431,
+      "seasonHardHitRate": 0.5104602510460251,
+      "seasonBarrelRate": 0.14225941422594143,
+      "seasonXwoba": 0.3675969173553718,
+      "seasonExpectedSlgOnContact": 0.7098432203389832,
+      "seasonAverageBatSpeed": 77.26002971768206,
+      "recentPlateAppearances": 108,
+      "recentBattedBalls": 72,
+      "recentAverageExitVelocity": 93.26805555555553,
+      "recentAverageLaunchAngle": 7.319444444444445,
+      "recentHardHitRate": 0.5,
+      "recentBarrelRate": 0.1527777777777778,
+      "recentXwoba": 0.36351947663551404,
+      "recentExpectedSlgOnContact": 0.7054999999999999,
+      "recentAverageBatSpeed": 77.79427083333333,
+      "seasonXwobaDifference": 0.02405574353032125,
+      "recentXwobaDifference": 0.019978302810463477,
+      "targetEnd": "2026-07-13",
+      "baselineRate": 1.9226444794243311,
+      "priorActualRate": 2.2664835164835164,
+      "outcomeRateDifference": 0.3438390370591853,
+      "futurePlateAppearances": 31,
+      "futurePoints": 89,
+      "futureRate": 2.870967741935484,
+      "errorAdjustedRate": 1.9493588614603827,
+      "errorAdjustmentRate": 0.02671438203605161,
+      "rankingAdjustedRate": 1.9493588614603827,
+      "rankingAdjustmentRate": 0.02671438203605161
+    }
+  ],
+  "topCandidates": [
+    {
+      "featureSet": "xwoba",
+      "ridge": 1,
+      "reliabilityPA": 400,
+      "maxAdjustmentRate": 0.25,
+      "validationWeightedRmse": 0.732,
+      "validationCorrelation": 0.2239
+    },
+    {
+      "featureSet": "xwoba",
+      "ridge": 1,
+      "reliabilityPA": 400,
+      "maxAdjustmentRate": 0.5,
+      "validationWeightedRmse": 0.732,
+      "validationCorrelation": 0.2239
+    },
+    {
+      "featureSet": "xwoba",
+      "ridge": 1,
+      "reliabilityPA": 400,
+      "maxAdjustmentRate": 1,
+      "validationWeightedRmse": 0.732,
+      "validationCorrelation": 0.2239
+    },
+    {
+      "featureSet": "xwoba",
+      "ridge": 1,
+      "reliabilityPA": 200,
+      "maxAdjustmentRate": 0.25,
+      "validationWeightedRmse": 0.7321,
+      "validationCorrelation": 0.2233
+    },
+    {
+      "featureSet": "xwoba",
+      "ridge": 1,
+      "reliabilityPA": 200,
+      "maxAdjustmentRate": 0.5,
+      "validationWeightedRmse": 0.7321,
+      "validationCorrelation": 0.2233
+    },
+    {
+      "featureSet": "xwoba",
+      "ridge": 1,
+      "reliabilityPA": 200,
+      "maxAdjustmentRate": 1,
+      "validationWeightedRmse": 0.7321,
+      "validationCorrelation": 0.2233
+    },
+    {
+      "featureSet": "xwoba",
+      "ridge": 4,
+      "reliabilityPA": 200,
+      "maxAdjustmentRate": 0.25,
+      "validationWeightedRmse": 0.7322,
+      "validationCorrelation": 0.2231
+    },
+    {
+      "featureSet": "xwoba",
+      "ridge": 4,
+      "reliabilityPA": 200,
+      "maxAdjustmentRate": 0.5,
+      "validationWeightedRmse": 0.7322,
+      "validationCorrelation": 0.2231
+    },
+    {
+      "featureSet": "xwoba",
+      "ridge": 4,
+      "reliabilityPA": 200,
+      "maxAdjustmentRate": 1,
+      "validationWeightedRmse": 0.7322,
+      "validationCorrelation": 0.2231
+    },
+    {
+      "featureSet": "confirmed",
+      "ridge": 1,
+      "reliabilityPA": 100,
+      "maxAdjustmentRate": 0.25,
+      "validationWeightedRmse": 0.7322,
+      "validationCorrelation": 0.2229
+    },
+    {
+      "featureSet": "confirmed",
+      "ridge": 1,
+      "reliabilityPA": 100,
+      "maxAdjustmentRate": 0.5,
+      "validationWeightedRmse": 0.7322,
+      "validationCorrelation": 0.2229
+    },
+    {
+      "featureSet": "confirmed",
+      "ridge": 1,
+      "reliabilityPA": 100,
+      "maxAdjustmentRate": 1,
+      "validationWeightedRmse": 0.7322,
+      "validationCorrelation": 0.2229
+    }
+  ]
+}

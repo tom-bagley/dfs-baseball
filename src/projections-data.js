@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 import { simulatePitcherOutcomes } from './pitcher-outcome-sim.js';
 import { simulateHitterOutcomes } from './hitter-outcome-sim.js';
+import { applyHitterSkillAdjustments } from './hitter-skill-adjustment.js';
 
 const ROOT = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const CACHE_ROOT = resolve(process.env.CACHE_DIR || join(ROOT, 'out', 'cache'));
@@ -229,6 +230,23 @@ export async function getPlayerProjectionSlate({
   } catch (error) {
     cacheStats.pitcherExperience = 'unavailable';
     cacheStats.pitcherExperienceError = formatError(error);
+  }
+
+  try {
+    const skillStats = await applyHitterSkillAdjustments(rows, { date });
+    cacheStats.hitterSkillAdjustment = skillStats.status;
+    cacheStats.hitterSkillModelVersion = skillStats.modelVersion;
+    cacheStats.hitterSkillMatched = skillStats.matched;
+    cacheStats.hitterSkillAdjusted = skillStats.adjusted;
+    cacheStats.hitterSkillTotal = skillStats.totalHitters;
+  } catch (error) {
+    cacheStats.hitterSkillAdjustment = 'unavailable';
+    cacheStats.hitterSkillError = formatError(error);
+    for (const row of rows) {
+      row.baselineExpectedPoints = row.expectedPoints;
+      row.skillAdjustedPoints = row.expectedPoints;
+      row.skillAdjustment = 0;
+    }
   }
 
   const draftKings = await loadDraftKingsSalaries(date);
@@ -854,7 +872,7 @@ function hitterStats(average = {}, histograms = {}, context = {}) {
   const hitByPitch = stat(average, 'HBP');
   const stolenBases = stat(average, 'SB');
 
-  const hitterPoints =
+  const baseHitterPoints =
     singles * 3 +
     doubles * 5 +
     triples * 8 +
@@ -864,8 +882,10 @@ function hitterStats(average = {}, histograms = {}, context = {}) {
     walks * 2 +
     hitByPitch * 2 +
     stolenBases * 5;
+  const hitterPoints = baseHitterPoints;
 
   return {
+    plateAppearances: stat(average, 'PA'),
     singles,
     doubles,
     triples,
@@ -875,6 +895,9 @@ function hitterStats(average = {}, histograms = {}, context = {}) {
     walks,
     hitByPitch,
     stolenBases,
+    baseHitterPoints: roundStat(baseHitterPoints),
+    hitterProjectionAdjustment: 0,
+    hitterCalibrationVersion: null,
     hitterPoints: roundStat(hitterPoints),
     pitcherPoints: null,
     expectedPoints: roundStat(hitterPoints),
@@ -1167,6 +1190,9 @@ function blankHittingStats() {
     walks: null,
     hitByPitch: null,
     stolenBases: null,
+    baseHitterPoints: null,
+    hitterProjectionAdjustment: null,
+    hitterCalibrationVersion: null,
     hitterPoints: null,
   };
 }

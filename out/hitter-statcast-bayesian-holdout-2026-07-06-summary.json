@@ -1,0 +1,354 @@
+{
+  "design": {
+    "holdoutStart": "2026-07-06",
+    "developmentDates": [
+      "2026-06-16",
+      "2026-06-17",
+      "2026-06-18",
+      "2026-06-19",
+      "2026-06-20",
+      "2026-06-21",
+      "2026-06-22",
+      "2026-06-23",
+      "2026-06-30",
+      "2026-07-02"
+    ],
+    "validationDates": [
+      "2026-06-19",
+      "2026-06-20",
+      "2026-06-21",
+      "2026-06-22",
+      "2026-06-23",
+      "2026-06-30",
+      "2026-07-02"
+    ],
+    "holdoutDates": [
+      "2026-07-06",
+      "2026-07-07",
+      "2026-07-08",
+      "2026-07-09",
+      "2026-07-10",
+      "2026-07-11",
+      "2026-07-12"
+    ],
+    "candidates": 432,
+    "statcastPlayers": 595,
+    "leakageControl": "All Statcast and MLB game-log evidence is filtered strictly before each projection date."
+  },
+  "errorSelectedModel": {
+    "priorPlateAppearances": 25,
+    "halfLifeDays": 14,
+    "multiplierCap": 1.5,
+    "adaptiveSensitivity": 2,
+    "disagreementThreshold": 1,
+    "xwobaThreshold": 0.01,
+    "minimumStatcastPA": 200,
+    "confirmationMode": "xwoba"
+  },
+  "rankingSelectedModel": {
+    "priorPlateAppearances": 100,
+    "halfLifeDays": 14,
+    "multiplierCap": 2,
+    "adaptiveSensitivity": 2,
+    "disagreementThreshold": 1,
+    "xwobaThreshold": 0.03,
+    "minimumStatcastPA": 50,
+    "confirmationMode": "xwoba"
+  },
+  "errorSelectedHoldout": {
+    "baseline": {
+      "hitters": 1746,
+      "averageProjection": 7.7,
+      "averageActual": 6.87,
+      "biasActualMinusProjection": -0.83,
+      "meanAbsoluteError": 5.76,
+      "medianAbsoluteError": 5.41,
+      "rootMeanSquaredError": 7.26,
+      "correlation": 0.1199
+    },
+    "bayesian": {
+      "hitters": 1746,
+      "averageProjection": 7.69,
+      "averageActual": 6.87,
+      "biasActualMinusProjection": -0.83,
+      "meanAbsoluteError": 5.77,
+      "medianAbsoluteError": 5.39,
+      "rootMeanSquaredError": 7.28,
+      "correlation": 0.1071
+    },
+    "improvement": {
+      "mae": -0.01,
+      "rmse": -0.02,
+      "correlation": -0.0128
+    }
+  },
+  "rankingSelectedHoldout": {
+    "baseline": {
+      "hitters": 1746,
+      "averageProjection": 7.7,
+      "averageActual": 6.87,
+      "biasActualMinusProjection": -0.83,
+      "meanAbsoluteError": 5.76,
+      "medianAbsoluteError": 5.41,
+      "rootMeanSquaredError": 7.26,
+      "correlation": 0.1199
+    },
+    "bayesian": {
+      "hitters": 1746,
+      "averageProjection": 7.72,
+      "averageActual": 6.87,
+      "biasActualMinusProjection": -0.86,
+      "meanAbsoluteError": 5.77,
+      "medianAbsoluteError": 5.41,
+      "rootMeanSquaredError": 7.27,
+      "correlation": 0.1157
+    },
+    "improvement": {
+      "mae": -0.01,
+      "rmse": -0.01,
+      "correlation": -0.0042
+    },
+    "baselineRanking": {
+      "meanDailyCorrelation": 0.1247,
+      "meanTop10PercentActual": 9.48
+    },
+    "bayesianRanking": {
+      "meanDailyCorrelation": 0.122,
+      "meanTop10PercentActual": 9.15
+    }
+  },
+  "jordanWalker": {
+    "baseline": {
+      "hitters": 8,
+      "averageProjection": 8.02,
+      "averageActual": 11.13,
+      "biasActualMinusProjection": 3.1,
+      "meanAbsoluteError": 5.9,
+      "medianAbsoluteError": 5.22,
+      "rootMeanSquaredError": 6.87,
+      "correlation": -0.4171
+    },
+    "bayesian": {
+      "hitters": 8,
+      "averageProjection": 9.03,
+      "averageActual": 11.13,
+      "biasActualMinusProjection": 2.09,
+      "meanAbsoluteError": 5.75,
+      "medianAbsoluteError": 4.7,
+      "rootMeanSquaredError": 6.45,
+      "correlation": -0.3245
+    }
+  },
+  "topRankingCandidates": [
+    {
+      "priorPlateAppearances": 100,
+      "halfLifeDays": 14,
+      "multiplierCap": 2,
+      "adaptiveSensitivity": 2,
+      "disagreementThreshold": 1,
+      "xwobaThreshold": 0.03,
+      "minimumStatcastPA": 50,
+      "confirmationMode": "xwoba",
+      "validationMetrics": {
+        "hitters": 1548,
+        "averageProjection": 7.72,
+        "averageActual": 7.22,
+        "biasActualMinusProjection": -0.5,
+        "meanAbsoluteError": 5.8,
+        "medianAbsoluteError": 5.33,
+        "rootMeanSquaredError": 7.35,
+        "correlation": 0.183
+      },
+      "meanDailyCorrelation": 0.1739
+    },
+    {
+      "priorPlateAppearances": 100,
+      "halfLifeDays": 14,
+      "multiplierCap": 2,
+      "adaptiveSensitivity": 2,
+      "disagreementThreshold": 1,
+      "xwobaThreshold": 0.01,
+      "minimumStatcastPA": 200,
+      "confirmationMode": "xwoba",
+      "validationMetrics": {
+        "hitters": 1548,
+        "averageProjection": 7.7,
+        "averageActual": 7.22,
+        "biasActualMinusProjection": -0.49,
+        "meanAbsoluteError": 5.8,
+        "medianAbsoluteError": 5.31,
+        "rootMeanSquaredError": 7.34,
+        "correlation": 0.1842
+      },
+      "meanDailyCorrelation": 0.1736
+    },
+    {
+      "priorPlateAppearances": 100,
+      "halfLifeDays": 14,
+      "multiplierCap": 2,
+      "adaptiveSensitivity": 2,
+      "disagreementThreshold": 1,
+      "xwobaThreshold": 0.03,
+      "minimumStatcastPA": 100,
+      "confirmationMode": "xwoba",
+      "validationMetrics": {
+        "hitters": 1548,
+        "averageProjection": 7.71,
+        "averageActual": 7.22,
+        "biasActualMinusProjection": -0.49,
+        "meanAbsoluteError": 5.8,
+        "medianAbsoluteError": 5.29,
+        "rootMeanSquaredError": 7.35,
+        "correlation": 0.183
+      },
+      "meanDailyCorrelation": 0.1736
+    },
+    {
+      "priorPlateAppearances": 50,
+      "halfLifeDays": 14,
+      "multiplierCap": 1.5,
+      "adaptiveSensitivity": 2,
+      "disagreementThreshold": 0.5,
+      "xwobaThreshold": 0.03,
+      "minimumStatcastPA": 50,
+      "confirmationMode": "xwoba",
+      "validationMetrics": {
+        "hitters": 1548,
+        "averageProjection": 7.69,
+        "averageActual": 7.22,
+        "biasActualMinusProjection": -0.47,
+        "meanAbsoluteError": 5.8,
+        "medianAbsoluteError": 5.34,
+        "rootMeanSquaredError": 7.34,
+        "correlation": 0.1827
+      },
+      "meanDailyCorrelation": 0.1734
+    },
+    {
+      "priorPlateAppearances": 100,
+      "halfLifeDays": 14,
+      "multiplierCap": 2,
+      "adaptiveSensitivity": 2,
+      "disagreementThreshold": 0.5,
+      "xwobaThreshold": 0.03,
+      "minimumStatcastPA": 50,
+      "confirmationMode": "xwoba",
+      "validationMetrics": {
+        "hitters": 1548,
+        "averageProjection": 7.71,
+        "averageActual": 7.22,
+        "biasActualMinusProjection": -0.49,
+        "meanAbsoluteError": 5.81,
+        "medianAbsoluteError": 5.34,
+        "rootMeanSquaredError": 7.35,
+        "correlation": 0.1817
+      },
+      "meanDailyCorrelation": 0.1732
+    },
+    {
+      "priorPlateAppearances": 100,
+      "halfLifeDays": 14,
+      "multiplierCap": 2,
+      "adaptiveSensitivity": 2,
+      "disagreementThreshold": 0.5,
+      "xwobaThreshold": 0.03,
+      "minimumStatcastPA": 100,
+      "confirmationMode": "xwoba",
+      "validationMetrics": {
+        "hitters": 1548,
+        "averageProjection": 7.69,
+        "averageActual": 7.22,
+        "biasActualMinusProjection": -0.48,
+        "meanAbsoluteError": 5.8,
+        "medianAbsoluteError": 5.31,
+        "rootMeanSquaredError": 7.35,
+        "correlation": 0.1821
+      },
+      "meanDailyCorrelation": 0.1731
+    },
+    {
+      "priorPlateAppearances": 25,
+      "halfLifeDays": 14,
+      "multiplierCap": 1.5,
+      "adaptiveSensitivity": 2,
+      "disagreementThreshold": 1,
+      "xwobaThreshold": 0.01,
+      "minimumStatcastPA": 200,
+      "confirmationMode": "xwoba",
+      "validationMetrics": {
+        "hitters": 1548,
+        "averageProjection": 7.69,
+        "averageActual": 7.22,
+        "biasActualMinusProjection": -0.47,
+        "meanAbsoluteError": 5.79,
+        "medianAbsoluteError": 5.28,
+        "rootMeanSquaredError": 7.34,
+        "correlation": 0.1843
+      },
+      "meanDailyCorrelation": 0.173
+    },
+    {
+      "priorPlateAppearances": 50,
+      "halfLifeDays": 14,
+      "multiplierCap": 2,
+      "adaptiveSensitivity": 2,
+      "disagreementThreshold": 1,
+      "xwobaThreshold": 0.01,
+      "minimumStatcastPA": 200,
+      "confirmationMode": "xwoba",
+      "validationMetrics": {
+        "hitters": 1548,
+        "averageProjection": 7.7,
+        "averageActual": 7.22,
+        "biasActualMinusProjection": -0.48,
+        "meanAbsoluteError": 5.8,
+        "medianAbsoluteError": 5.32,
+        "rootMeanSquaredError": 7.34,
+        "correlation": 0.1835
+      },
+      "meanDailyCorrelation": 0.173
+    },
+    {
+      "priorPlateAppearances": 25,
+      "halfLifeDays": 14,
+      "multiplierCap": 1.5,
+      "adaptiveSensitivity": 4,
+      "disagreementThreshold": 1,
+      "xwobaThreshold": 0.01,
+      "minimumStatcastPA": 200,
+      "confirmationMode": "xwoba",
+      "validationMetrics": {
+        "hitters": 1548,
+        "averageProjection": 7.69,
+        "averageActual": 7.22,
+        "biasActualMinusProjection": -0.47,
+        "meanAbsoluteError": 5.79,
+        "medianAbsoluteError": 5.28,
+        "rootMeanSquaredError": 7.34,
+        "correlation": 0.1841
+      },
+      "meanDailyCorrelation": 0.1729
+    },
+    {
+      "priorPlateAppearances": 100,
+      "halfLifeDays": 14,
+      "multiplierCap": 1.5,
+      "adaptiveSensitivity": 2,
+      "disagreementThreshold": 0.5,
+      "xwobaThreshold": 0.03,
+      "minimumStatcastPA": 50,
+      "confirmationMode": "xwoba",
+      "validationMetrics": {
+        "hitters": 1548,
+        "averageProjection": 7.7,
+        "averageActual": 7.22,
+        "biasActualMinusProjection": -0.48,
+        "meanAbsoluteError": 5.8,
+        "medianAbsoluteError": 5.31,
+        "rootMeanSquaredError": 7.35,
+        "correlation": 0.1826
+      },
+      "meanDailyCorrelation": 0.1729
+    }
+  ]
+}

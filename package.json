@@ -13,8 +13,20 @@
     "backtest:calibration": "node src/backtest-projection-calibration.js",
     "backtest:pitchers": "node src/backtest-pitcher-percentiles.js",
     "backtest:hitters": "node src/backtest-hitter-percentiles.js",
+    "analyze:hitters": "node src/analyze-hitter-direct-projections.js",
+    "backtest:hitters:calibration": "node src/backtest-hitter-bayesian-calibration.js",
+    "backtest:hitters:player-bayesian": "node src/backtest-hitter-player-bayesian.js",
+    "backtest:hitters:bayesian": "node src/backtest-hitter-season-bayesian.js",
+    "backtest:hitters:statcast": "node src/backtest-hitter-statcast-bayesian.js",
+    "backtest:hitters:statcast-regression": "node src/backtest-hitter-statcast-regression.js",
+    "backtest:hitters:forward-disagreements": "node src/backtest-hitter-forward-disagreements.js",
+    "fetch:statcast": "node src/fetch-statcast-chunks.js",
     "test:pitchers": "node src/test-pitcher-outcome-sim.js",
-    "test:hitters": "node src/test-hitter-outcome-sim.js"
+    "test:hitters": "node src/test-hitter-outcome-sim.js",
+    "test:hitters:calibration": "node src/test-hitter-bayesian-calibration.js",
+    "test:hitters:bayesian": "node src/test-hitter-season-bayesian.js",
+    "test:hitters:statcast": "node src/test-statcast-hitter-features.js",
+    "test:hitters:skill": "node src/test-hitter-skill-adjustment.js"
   },
   "dependencies": {},
   "devDependencies": {}

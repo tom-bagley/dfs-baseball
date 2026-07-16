@@ -116,9 +116,57 @@ This writes one row per simulated hitter and pitcher, sorted by `expectedPoints`
 
 Starting pitchers in the Players viewer also receive deterministic P10, P20, P50, P80, and P90 DraftKings outcomes from a 10,000-start conditional Monte Carlo model. The model connects workload, strikeouts, baserunners, runs, and win eligibility, then recenters the distribution on the FanGraphs expected-points projection. Historical experience can widen the distribution without changing its mean.
 
-Hitters receive deterministic P10, P20, P50, P80, and P90 DraftKings outcomes from 10,000 simulated games. The hitter model samples the matchup-specific FanGraphs histograms for each scoring event and uses shared game-quality, power, and speed factors so hits, runs, RBI, and steals are not treated as unrelated outcomes. A tested calibration offset is supported, but the application retains the unshifted distribution because it produced better interval coverage and median absolute error on the independent validation sample.
+Hitters receive deterministic P10, P20, P50, P80, and P90 DraftKings outcomes from 10,000 simulated games. The hitter model samples the matchup-specific FanGraphs histograms for each scoring event and uses shared game-quality, power, and speed factors so hits, runs, RBI, and steals are not treated as unrelated outcomes. Live `expectedPoints` currently retains the raw FanGraphs mean; experimental calibration and Bayesian models must improve out-of-sample player differentiation before replacing it.
 
 Validate hitter percentiles against official MLB box scores with `npm.cmd run backtest:hitters -- --start 2026-07-06 --end 2026-07-12`. Because hitter scoring is discrete and bounded at zero, the summary reports both the fraction strictly below and at-or-below each quantile; a calibrated quantile target should fall between those two rates.
+
+### Hitter Mean Calibration
+
+```powershell
+npm.cmd run backtest:hitters:calibration
+```
+
+This is a research benchmark, not the player-level Bayesian updater described below. Candidate selection uses rolling dates where every prediction is trained only on earlier games. Its conservative offset reduced holdout MAE from 5.76 to 5.62, but it cannot change player rankings and is therefore not used by live projections.
+
+### Player-Level Bayesian Experiment
+
+```powershell
+node src/fetch-hitter-season-histories.js
+npm.cmd run backtest:hitters:bayesian
+```
+
+The article-style experiment uses each current FanGraphs component rate as the prior and all MLB game-log evidence strictly before the projection date as the likelihood. A Gamma–Poisson posterior updates singles, extra-base hits, walks, runs, RBI, and stolen-base rates per plate appearance. Prior strength, recency, and posterior caps are chosen on rolling development dates before the July 6–12 holdout. This model is not used in production: validation selected a very strong 400-PA prior, and on holdout MAE remained 5.76 while RMSE moved from 7.26 to 7.27 and correlation declined from 0.1199 to 0.1166. The evidence therefore did not justify overriding FanGraphs player rankings.
+
+A second experiment reduces prior weight only for statistically large disagreements and can require the signal to agree across recent and full-season windows. This correctly raised Jordan Walker's July average from 8.02 to 9.35 and reduced his RMSE from 6.87 to 6.32. It did not generalize across all hitters: the persistence-selected model worsened holdout RMSE and correlation. Treat `seasonBayesianProjection` as a research disagreement signal, not a replacement for `expectedPoints`.
+
+### Statcast Hitter Evidence
+
+```powershell
+npm.cmd run fetch:statcast -- --start 2026-03-26 --end 2026-07-11
+npm.cmd run backtest:hitters:statcast
+npm.cmd run backtest:hitters:statcast-regression
+```
+
+The Statcast collector downloads small, restartable Baseball Savant date chunks and caches them under `out/cache/statcast/chunks`. The feature builder aggregates only pitches strictly before each projection date. It supplies full-season and trailing-30-day plate appearances, batted balls, average exit velocity, launch angle, hard-hit rate, barrel rate, xwOBA, expected slugging on contact, and bat speed. It also measures full-season and recent xwOBA disagreement with the FanGraphs component projection.
+
+Two deliberately different models consume those features. The gated Bayesian model uses Statcast to confirm only large same-direction game-log disagreements; it is useful as a research flag but failed the population holdout. The zero-prior ridge model learns direct residual weights without an intercept. Its ranking-selected xwOBA version slightly improved holdout daily correlation from 0.1247 to 0.1249 and the realized score of the projected top 10% from 9.48 to 9.58, but moved Jordan Walker only 0.01 points per game. That is too weak to replace live `expectedPoints`. Walker's July 12 pregame evidence remains available in the research CSV: 94.2 mph average exit velocity, 51.5% hard-hit rate, 14.1% barrel rate, and .373 xwOBA versus the component projection's .325 wOBA.
+
+Single-game fantasy results are an especially noisy target for player-skill disagreements. The forward-window benchmark instead asks whether an adjustment made on an anchor date improves the player's aggregate DraftKings rate over the following games:
+
+```powershell
+npm.cmd run backtest:hitters:forward-disagreements -- --horizon-days 7 --holdout-start 2026-07-06
+```
+
+The benchmark requires at least 12 future plate appearances and rejects incomplete horizons. Training examples are eligible only after their entire future window has ended. On the complete July 6 seven-day holdout, the selected season/recent xwOBA model improved weighted RMSE from 0.7829 to 0.7772 DK points per PA, correlation from 0.0910 to 0.1087, and the top-20% realized rate from 1.6983 to 1.7485. Among the 27 largest adjustments it improved RMSE from 0.7740 to 0.7543 and chose the correct direction 66.7% of the time. Five- and ten-day tests also improved RMSE, but these windows overlap and the clean seven-day holdout contains only 129 hitters. Treat this as the first positive player-specific evidence, not yet as sufficient support for changing live `expectedPoints`.
+
+The Players page exposes this research model through the **Rankings** dropdown. **FanGraphs baseline** retains the original points and **Skill adjusted** applies the frozen `forward-xwoba-7d-v1` hitter adjustment; pitchers remain unchanged. The selected value controls table ranking, value calculations, and every lineup optimizer build. The `Skill Δ` column always shows how far the skill projection is from baseline. The API preserves `baselineExpectedPoints`, `skillAdjustedPoints`, `skillAdjustment`, the model version, xwOBA diagnostics, and evidence PA so the two methods can be scored later without ambiguity.
+
+Refresh the evidence periodically, then restart the viewer so its in-memory Statcast cache is rebuilt:
+
+```powershell
+npm.cmd run fetch:statcast -- --start 2026-07-12 --end 2026-07-18
+npm.cmd run viewer
+```
 
 ## Pitcher Percentile Backtest
 

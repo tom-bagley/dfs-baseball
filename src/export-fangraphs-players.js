@@ -161,7 +161,7 @@ function hitterStats(average = {}) {
   const hitByPitch = stat(average, 'HBP');
   const stolenBases = stat(average, 'SB');
 
-  const hitterPoints =
+  const baseHitterPoints =
     singles * 3 +
     doubles * 5 +
     triples * 8 +
@@ -171,6 +171,7 @@ function hitterStats(average = {}) {
     walks * 2 +
     hitByPitch * 2 +
     stolenBases * 5;
+  const hitterPoints = baseHitterPoints;
 
   return {
     singles,

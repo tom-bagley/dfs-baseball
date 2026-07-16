@@ -772,6 +772,13 @@
           </button>
         </div>
         <div class="control-group optimizer-controls">
+          <label title="Choose which projection ranks players and supplies points to the lineup optimizer">
+            Rankings
+            <select id="projectionModeInput" class="optimizer-select">
+              <option value="baseline" selected>FanGraphs baseline</option>
+              <option value="skill">Skill adjusted</option>
+            </select>
+          </label>
           <label title="Cash uses an unstacked preset; GPP starts with a correlated 5-3 build">
             Contest
             <select id="contestModeInput" class="optimizer-select">
@@ -906,7 +913,8 @@
               <th class="num hitter-col" data-sort-key="lineupSlot">Slot</th>
               <th class="hitter-col" data-sort-key="position">Pos</th>
               <th class="pitcher-col" data-sort-key="role">Role</th>
-              <th class="num" data-sort-key="expectedPoints">Expected</th>
+              <th id="activePointsHeader" class="num" data-sort-key="expectedPoints">Baseline</th>
+              <th class="num hitter-col" data-sort-key="skillAdjustment" title="Skill-adjusted points minus the FanGraphs baseline">Skill Δ</th>
               <th class="num" data-sort-key="p10" title="10th-percentile simulated DraftKings points">P10</th>
               <th class="num" data-sort-key="p20" title="20th-percentile simulated DraftKings points">P20</th>
               <th class="num" data-sort-key="p50" title="Median simulated DraftKings points">P50</th>
@@ -942,6 +950,7 @@
       refreshedAt: "",
       cache: null,
       selectedGameKeys: new Set(),
+      projectionMode: "baseline",
     };
 
     // Relative /api URLs only resolve when the page is served by the dev
@@ -959,6 +968,7 @@
     const gamesAllButton = document.querySelector("#gamesAllButton");
     const gamesNoneButton = document.querySelector("#gamesNoneButton");
     const positionRoleFilter = document.querySelector("#positionRoleFilter");
+    const projectionModeInput = document.querySelector("#projectionModeInput");
     const contestModeInput = document.querySelector("#contestModeInput");
     const budgetInput = document.querySelector("#budgetInput");
     const stackConstructionInput = document.querySelector("#stackConstructionInput");
@@ -979,6 +989,7 @@
     const hitterMetric = document.querySelector("#hitterMetric");
     const pitcherMetric = document.querySelector("#pitcherMetric");
     const headers = [...document.querySelectorAll("th[data-sort-key]")];
+    const activePointsHeader = document.querySelector("#activePointsHeader");
 
     dateInput.value = localDateString(new Date());
 
@@ -986,6 +997,16 @@
 
     refreshButton.addEventListener("click", () => {
       refreshPlayers(dateInput.value);
+    });
+
+    projectionModeInput.addEventListener("change", () => {
+      state.projectionMode = projectionModeInput.value === "skill" ? "skill" : "baseline";
+      applyProjectionMode();
+      state.sortKey = "expectedPoints";
+      state.sortDirection = "desc";
+      applyFilterAndSort();
+      renderTable();
+      if (!optimizerShell.hidden) calculateMaxPoints();
     });
 
     demoButton.addEventListener("click", () => {
@@ -1211,7 +1232,15 @@
     function applyPlayerRows(result) {
       const playerRows = Array.isArray(result.rows) ? result.rows : [];
 
+      for (const row of playerRows) {
+        const baseline = finiteNumber(row.baselineExpectedPoints, row.expectedPoints);
+        row.baselineExpectedPoints = baseline;
+        row.skillAdjustedPoints = finiteNumber(row.skillAdjustedPoints, baseline);
+        row.skillAdjustment = finiteNumber(row.skillAdjustment, row.skillAdjustedPoints - baseline);
+      }
+
       state.rows = playerRows;
+      applyProjectionMode();
       state.refreshedAt = result.refreshedAt || "";
       state.cache = result.cache || null;
       populateGameFilter(true);
@@ -1280,6 +1309,9 @@
               position,
               role: "",
               expectedPoints,
+              baselineExpectedPoints: expectedPoints,
+              skillAdjustedPoints: Number((expectedPoints + (((teamOffset + lineupSlot) % 7) - 3) * 0.12).toFixed(2)),
+              skillAdjustment: Number(((((teamOffset + lineupSlot) % 7) - 3) * 0.12).toFixed(2)),
               hitterPoints: expectedPoints,
               pitcherPoints: null,
               simulationCount: 10000,
@@ -1330,6 +1362,9 @@
             position: "",
             role: "Starter",
             expectedPoints,
+            baselineExpectedPoints: expectedPoints,
+            skillAdjustedPoints: expectedPoints,
+            skillAdjustment: 0,
             pitcherPoints: expectedPoints,
             simulationCount: 10000,
             simulationMean: expectedPoints,
@@ -1524,7 +1559,8 @@
           ? `, max ${diversity.maxShared} shared players between builds`
           : `, each player in at most ${diversity.maxAppearances} builds`;
       const shortfallNote = diversity && builds.length < MAX_BUILDS ? ` Only ${builds.length} builds satisfy the diversity rule; relax it for more.` : "";
-      optimizerSummary.textContent = `${contestNote}: top ${builds.length} builds within ${formatSalary(budget)}${stackNote}${runNote}${conflictNote}${diversityNote}${excludeNote}. Best ${builds[0].points.toFixed(2)} pts (2 P, 8 hitters from ${starters.length + hitters.length} eligible players).${shortfallNote}`;
+      const projectionNote = state.projectionMode === "skill" ? "Skill adjusted" : "FanGraphs baseline";
+      optimizerSummary.textContent = `${projectionNote} · ${contestNote}: top ${builds.length} builds within ${formatSalary(budget)}${stackNote}${runNote}${conflictNote}${diversityNote}${excludeNote}. Best ${builds[0].points.toFixed(2)} pts (2 P, 8 hitters from ${starters.length + hitters.length} eligible players).${shortfallNote}`;
       optimizerBody.innerHTML = builds.map((build, index) => {
         const stackCounts = new Map();
         for (const pick of build.lineup) {
@@ -2418,6 +2454,7 @@
           <td class="hitter-col">${escapeHtml(row.position || "")}</td>
           <td class="pitcher-col">${escapeHtml(row.role || "")}</td>
           <td class="num">${formatNumber(row.expectedPoints, 2)}</td>
+          <td class="num hitter-col" title="Baseline ${formatNumber(row.baselineExpectedPoints, 2)} / Skill ${formatNumber(row.skillAdjustedPoints, 2)}">${formatSigned(row.skillAdjustment, 2)}</td>
           <td class="num">${formatNumber(row.p10, 2)}</td>
           <td class="num">${formatNumber(row.p20, 2)}</td>
           <td class="num">${formatNumber(row.p50, 2)}</td>
@@ -2473,6 +2510,31 @@
 
     function formatWhole(value) {
       return typeof value === "number" ? String(value) : "";
+    }
+
+    function applyProjectionMode() {
+      const useSkill = state.projectionMode === "skill";
+      activePointsHeader.textContent = useSkill ? "Skill Adj." : "Baseline";
+      activePointsHeader.title = useSkill
+        ? "Skill-adjusted points used for rankings and optimization"
+        : "FanGraphs baseline points used for rankings and optimization";
+      for (const row of state.rows) {
+        const baseline = finiteNumber(row.baselineExpectedPoints, row.expectedPoints);
+        const selected = useSkill ? finiteNumber(row.skillAdjustedPoints, baseline) : baseline;
+        row.expectedPoints = selected;
+        row.dkValue = typeof selected === "number" && row.dkSalary > 0 ? selected / (row.dkSalary / 1000) : null;
+        row.dkDollarsPerPoint = typeof selected === "number" && selected > 0 && row.dkSalary > 0 ? row.dkSalary / selected : null;
+      }
+    }
+
+    function finiteNumber(value, fallback = null) {
+      return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+    }
+
+    function formatSigned(value, digits = 2) {
+      if (typeof value !== "number" || !Number.isFinite(value)) return "--";
+      if (Math.abs(value) < 0.5 * 10 ** -digits) return Number(0).toFixed(digits);
+      return `${value > 0 ? "+" : ""}${value.toFixed(digits)}`;
     }
 
     function homeAwayLabel(side) {

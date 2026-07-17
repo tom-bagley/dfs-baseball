@@ -1,0 +1,127 @@
+{
+  "dates": [
+    "2026-07-16"
+  ],
+  "threshold": 0.55,
+  "lines": 85,
+  "decided": 85,
+  "voids": 0,
+  "ungraded": 0,
+  "winRate": 0.2118,
+  "predictedWinRate": 0.3692,
+  "brier": 0.148,
+  "calibration": [
+    {
+      "bucket": "0-50%",
+      "picks": 56,
+      "predicted": 0.1975,
+      "actual": 0.0714
+    },
+    {
+      "bucket": "50-55%",
+      "picks": 3,
+      "predicted": 0.5274,
+      "actual": 0.3333
+    },
+    {
+      "bucket": "55-60%",
+      "picks": 4,
+      "predicted": 0.5795,
+      "actual": 0.25
+    },
+    {
+      "bucket": "60-70%",
+      "picks": 8,
+      "predicted": 0.6292,
+      "actual": 0.375
+    },
+    {
+      "bucket": "70-85%",
+      "picks": 12,
+      "predicted": 0.804,
+      "actual": 0.5833
+    },
+    {
+      "bucket": "85-100%",
+      "picks": 2,
+      "predicted": 0.8685,
+      "actual": 1
+    }
+  ],
+  "edges": {
+    "picks": 7,
+    "wins": 1,
+    "winRate": 0.1429,
+    "predictedWinRate": 0.7134,
+    "predictedPerSlotMultiple": 0.5751,
+    "realizedPerSlotMultiple": 0.1
+  },
+  "entryProfit": -5,
+  "entries": [
+    {
+      "date": "2026-07-16",
+      "size": 2,
+      "outcome": "loss",
+      "profit": -1,
+      "predictedWinProbability": 0.4773,
+      "picks": [
+        "Bo Bichette ▲1.5 Hits + Runs + RBIs (loss)",
+        "Alec Bohm ▲0.5 Hits + Runs + RBIs (loss)"
+      ]
+    },
+    {
+      "date": "2026-07-16",
+      "size": 3,
+      "outcome": "loss",
+      "profit": -1,
+      "predictedWinProbability": 0.2862,
+      "picks": [
+        "Bo Bichette ▲1.5 Hits + Runs + RBIs (loss)",
+        "Francisco Lindor ▲1.5 Hits + Runs + RBIs (loss)",
+        "Alec Bohm ▲0.5 Hits + Runs + RBIs (loss)"
+      ]
+    },
+    {
+      "date": "2026-07-16",
+      "size": 4,
+      "outcome": "loss",
+      "profit": -1,
+      "predictedWinProbability": 0.2333,
+      "picks": [
+        "Bo Bichette ▲1.5 Hits + Runs + RBIs (loss)",
+        "Francisco Lindor ▲1.5 Hits + Runs + RBIs (loss)",
+        "Carson Benge ▲0.5 Hits + Runs + RBIs (win)",
+        "Alec Bohm ▲0.5 Hits + Runs + RBIs (loss)"
+      ]
+    },
+    {
+      "date": "2026-07-16",
+      "size": 5,
+      "outcome": "loss",
+      "profit": -1,
+      "predictedWinProbability": 0.1847,
+      "picks": [
+        "Bo Bichette ▲1.5 Hits + Runs + RBIs (loss)",
+        "Francisco Lindor ▲1.5 Hits + Runs + RBIs (loss)",
+        "Carson Benge ▲0.5 Hits + Runs + RBIs (win)",
+        "Jorge Polanco ▲0.5 Hits + Runs + RBIs (loss)",
+        "Alec Bohm ▲0.5 Hits + Runs + RBIs (loss)"
+      ]
+    },
+    {
+      "date": "2026-07-16",
+      "size": 6,
+      "outcome": "loss",
+      "profit": -1,
+      "predictedWinProbability": 0.0633,
+      "picks": [
+        "Bo Bichette ▲1.5 Hits + Runs + RBIs (loss)",
+        "Francisco Lindor ▲1.5 Hits + Runs + RBIs (loss)",
+        "Carson Benge ▲0.5 Hits + Runs + RBIs (win)",
+        "Jorge Polanco ▲0.5 Hits + Runs + RBIs (loss)",
+        "Alec Bohm ▲0.5 Hits + Runs + RBIs (loss)",
+        "Christian Scott ▲6.5 Strikeouts Thrown (win)"
+      ]
+    }
+  ]
+}

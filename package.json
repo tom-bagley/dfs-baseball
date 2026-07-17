@@ -7,6 +7,7 @@
   "scripts": {
     "start": "node src/team-projections-server.js",
     "viewer": "node src/team-projections-server.js",
+    "dev": "node --watch src/team-projections-server.js",
     "export": "node src/export-fangraphs-sim.js",
     "export:players": "node src/export-fangraphs-players.js",
     "backtest:moneylines": "node src/backtest-fangraphs-moneylines.js",
@@ -20,13 +21,13 @@
     "backtest:hitters:statcast": "node src/backtest-hitter-statcast-bayesian.js",
     "backtest:hitters:statcast-regression": "node src/backtest-hitter-statcast-regression.js",
     "backtest:hitters:forward-disagreements": "node src/backtest-hitter-forward-disagreements.js",
+    "backtest:pick6": "node src/backtest-pick6.js",
     "fetch:statcast": "node src/fetch-statcast-chunks.js",
     "test:pitchers": "node src/test-pitcher-outcome-sim.js",
     "test:hitters": "node src/test-hitter-outcome-sim.js",
     "test:hitters:calibration": "node src/test-hitter-bayesian-calibration.js",
     "test:hitters:bayesian": "node src/test-hitter-season-bayesian.js",
-    "test:hitters:statcast": "node src/test-statcast-hitter-features.js",
-    "test:hitters:skill": "node src/test-hitter-skill-adjustment.js"
+    "test:hitters:statcast": "node src/test-statcast-hitter-features.js"
   },
   "dependencies": {},
   "devDependencies": {}

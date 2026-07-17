@@ -28,6 +28,10 @@ The CSV includes game ids, start time, teams, FanGraphs lineup source, starting 
 npm.cmd start
 ```
 
+During development, `npm.cmd run dev` runs the same server under `node --watch`, which restarts it automatically whenever a file in `src/` changes. HTML pages never need a restart either way — they are read from disk on every request.
+
+For an always-on local server, `scripts/start-viewer-hidden.vbs` launches the viewer in the background with no console window (also under `node --watch`). A shortcut to it in the Windows Startup folder (`shell:startup`) starts it at every login, so `http://localhost:8000/` is always available — and daily Pick6 snapshots land in the local repo where they can be committed. To stop the background server, end the `node` process in Task Manager; to disable autostart, delete the Startup shortcut.
+
 Then open:
 
 ```text
@@ -38,7 +42,7 @@ If port 8000 is already in use, the viewer automatically tries the next port. Op
 
 The viewer has Teams and Players pages. Pick a date and click `Refresh`; the server fetches the FanGraphs schedule for that date, reuses any cached simulation payloads it already has, fetches only new simulation ids, and returns table-ready JSON to the page. The Teams page also joins fresh ESPN odds. CSV exports still exist as command-line tools, but the app no longer depends on CSV files for normal use.
 
-Cached FanGraphs sims are written to `out/cache/` by default. Set `CACHE_DIR` to move that cache somewhere else.
+Cached FanGraphs sims are written to `out/cache/` by default. Set `CACHE_DIR` to move that cache somewhere else. Simulations for games that have already started are cached permanently (the backtests depend on the original pregame payloads), but pregame simulations expire after 30 minutes so anticipated starters and projected lineups keep tracking FanGraphs' updates; tune this with the `PREGAME_SIM_TTL_MINUTES` environment variable.
 
 On the Players page, use the `DK Slate` dropdown to pull DraftKings salaries automatically: it lists that date's classic MLB slates (main, early, night, turbo) straight from the DraftKings lobby, and selecting one downloads the player pool and salaries for that slate. Salaries are cached by date, joined to player projections on refresh, and shown in the player table.
 
@@ -47,6 +51,26 @@ The lineup optimizer has Cash and GPP presets. GPP builds support 4+ or 5+ prima
 During off days, click `Demo Slate` or open `/player-projections.html?demo=1` to load deterministic fake projections, salaries, confirmed batting orders, and starting pitchers. Demo players are clearly labeled and never written to the projection cache.
 
 After a slate loads, use the `Custom` button on any row to edit that game's batting orders and starting pitchers. The editor starts with FanGraphs' current sim inputs, lets you swap player ids from the loaded sim player list, then sends a custom FanGraphs simulation request and replaces that game in the table with the custom result. Repeated custom payloads are cached under `fangraphs-custom-sims`.
+
+## Higher / Lower Board
+
+The viewer's `Higher/Lower` page (`/higher-lower.html`) pulls the day's DraftKings Pick6 MLB board and grades every line against the FanGraphs simulations. The board is read from the React Router loader state DraftKings serializes into the page (decoded with a vendored copy of `turbo-stream` under `src/vendor/`), which exposes every pickable across every stat tab — not just the featured cards — plus each alternate line and its payout multiplier. If that decode ever breaks, the page falls back to scraping the server-rendered featured cards (default lines only).
+
+Single-stat categories (for example `Strikeouts Thrown`, `Hits`, `Home Runs`, `Stolen Bases`) are read exactly from the FanGraphs marginal histograms; composite hitter categories (`Hits + Runs + RBIs`, `Total Bases`, `Extra Base Hits`, `Fantasy Points`) run the shared correlated hitter outcome simulation and evaluate the sum per simulated game. Each line shows the probability of finishing above and below it, alternate-line payout multipliers, and a per-slot `Prob × Mult` expected multiple. Default-line rows whose better side clears the threshold input (55% by default) are flagged.
+
+The Pick6 lobby only serves the current board, so historical dates fall back to boards cached under `out/cache/pick6/`.
+
+### Pick6 Backtest
+
+Every time the Higher/Lower board is refreshed, the server snapshots the matched pregame lines — probabilities, multipliers, and default flags — to `out/cache/pick6/snapshot-YYYY-MM-DD-<system>.json`. Lines keep updating until their game starts and are then frozen, so each snapshot ends up holding the final pregame odds. Grade them against official MLB box scores with:
+
+```powershell
+npm.cmd run backtest:pick6 -- --start 2026-07-16 --end 2026-07-20
+```
+
+The report shows best-side calibration by probability bucket, Brier score, win rate and realized per-slot multiple for flagged edges (`--threshold 0.55` by default), and the profit of the page's greedy best entries per size, graded with DraftKings' void rules (a pick that pushes or whose player does not appear drops the entry to the lower pick level). Outputs are `out/pick6-backtest-rows.csv` and `out/pick6-backtest-summary.json`. Remember that one slate is one heavily correlated observation — same-game picks live and die together — so judge the model on a few weeks of snapshots, not a single day.
+
+The Entry Profitability panel turns line probabilities into entry-level economics. A Pick6 entry pays `base payout × product of pick multipliers` when every pick hits, so EV per $1 is `base payout × ∏ multiplier × ∏ probability`. Base payouts per pick count are editable on the page (defaults 3/6/12/20/35×, stored in the browser) because DraftKings defines them per contest. The panel shows the per-pick break-even probability for each entry size, the best model entry per size (greedy by probability × multiplier, one pick per player, at least two teams), and an interactive slip: add any purchasable Higher/Lower side from the board with the ▲/▼ buttons to see combined win probability, payout, EV, and ROI. Entry math assumes picks are independent — same-game picks are correlated and are flagged with a warning.
 
 ## Render Hosting
 
@@ -158,8 +182,6 @@ npm.cmd run backtest:hitters:forward-disagreements -- --horizon-days 7 --holdout
 ```
 
 The benchmark requires at least 12 future plate appearances and rejects incomplete horizons. Training examples are eligible only after their entire future window has ended. On the complete July 6 seven-day holdout, the selected season/recent xwOBA model improved weighted RMSE from 0.7829 to 0.7772 DK points per PA, correlation from 0.0910 to 0.1087, and the top-20% realized rate from 1.6983 to 1.7485. Among the 27 largest adjustments it improved RMSE from 0.7740 to 0.7543 and chose the correct direction 66.7% of the time. Five- and ten-day tests also improved RMSE, but these windows overlap and the clean seven-day holdout contains only 129 hitters. Treat this as the first positive player-specific evidence, not yet as sufficient support for changing live `expectedPoints`.
-
-The Players page exposes this research model through the **Rankings** dropdown. **FanGraphs baseline** retains the original points and **Skill adjusted** applies the frozen `forward-xwoba-7d-v1` hitter adjustment; pitchers remain unchanged. The selected value controls table ranking, value calculations, and every lineup optimizer build. The `Skill Δ` column always shows how far the skill projection is from baseline. The API preserves `baselineExpectedPoints`, `skillAdjustedPoints`, `skillAdjustment`, the model version, xwOBA diagnostics, and evidence PA so the two methods can be scored later without ambiguity.
 
 Refresh the evidence periodically, then restart the viewer so its in-memory Statcast cache is rebuilt:
 

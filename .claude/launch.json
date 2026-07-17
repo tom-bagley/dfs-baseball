@@ -4,7 +4,7 @@
     {
       "name": "projections-server",
       "runtimeExecutable": "node",
-      "runtimeArgs": ["src/team-projections-server.js"],
+      "runtimeArgs": ["--watch", "src/team-projections-server.js"],
       "port": 8000
     }
   ]

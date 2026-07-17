@@ -1,11 +1,10 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, stat as statFile, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 import { simulatePitcherOutcomes } from './pitcher-outcome-sim.js';
 import { simulateHitterOutcomes } from './hitter-outcome-sim.js';
-import { applyHitterSkillAdjustments } from './hitter-skill-adjustment.js';
 
 const ROOT = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const CACHE_ROOT = resolve(process.env.CACHE_DIR || join(ROOT, 'out', 'cache'));
@@ -16,6 +15,10 @@ const ESPN_CORE_BASE_URL = 'https://sports.core.api.espn.com/v2/sports/baseball/
 const MLB_STATS_BASE_URL = 'https://statsapi.mlb.com/api/v1';
 const DEFAULT_PROJECTION_SYSTEM = 'rSteamer';
 const DEFAULT_LINE_TYPE = 'current';
+// Before first pitch FanGraphs keeps updating projected lineups and starters,
+// so cached pregame sims expire after this many minutes. Once a game starts
+// the cached payload is permanent: the backtests rely on original pregame sims.
+const PREGAME_SIM_TTL_MS = Math.max(1, Number(process.env.PREGAME_SIM_TTL_MINUTES) || 30) * 60 * 1000;
 const DISPLAY_TIME_ZONE = 'America/Chicago';
 const DK_LOBBY_URL = 'https://www.draftkings.com/lobby/getcontests?sport=MLB';
 const DK_DRAFTABLES_BASE_URL = 'https://api.draftkings.com/draftgroups/v1/draftgroups';
@@ -93,18 +96,17 @@ export async function getProjectionSlate({
     let error = '';
 
     if (simId) {
-      const cached = await getCachedJson(simCachePath(projectionSystem, simId));
-      if (cached) {
-        sim = cached;
-        cacheStats.simsHit += 1;
-      } else {
-        try {
-          sim = await fetchGameSimulation(simId, projectionSystem);
-          await writeCachedJson(simCachePath(projectionSystem, simId), sim);
-          cacheStats.simsMiss += 1;
-        } catch (fetchError) {
-          error = formatError(fetchError);
-        }
+      try {
+        const loaded = await loadGameSimulation({
+          simId,
+          projectionSystem,
+          gameTimeUtc: schedule.GameDateTimeUTC,
+          date,
+        });
+        sim = loaded.sim;
+        bumpSimCacheStats(cacheStats, loaded.status);
+      } catch (fetchError) {
+        error = formatError(fetchError);
       }
     } else {
       error = 'No MLBGameId or team ids were available for this schedule row.';
@@ -181,15 +183,14 @@ export async function getPlayerProjectionSlate({
     if (!simId) continue;
 
     try {
-      const cached = await getCachedJson(simCachePath(projectionSystem, simId));
-      let sim = cached;
-      if (sim) {
-        cacheStats.simsHit += 1;
-      } else {
-        sim = await fetchGameSimulation(simId, projectionSystem);
-        await writeCachedJson(simCachePath(projectionSystem, simId), sim);
-        cacheStats.simsMiss += 1;
-      }
+      const loaded = await loadGameSimulation({
+        simId,
+        projectionSystem,
+        gameTimeUtc: schedule.GameDateTimeUTC,
+        date,
+      });
+      const sim = loaded.sim;
+      bumpSimCacheStats(cacheStats, loaded.status);
 
       rows.push(...buildGamePlayerRows({
         date,
@@ -232,23 +233,6 @@ export async function getPlayerProjectionSlate({
     cacheStats.pitcherExperienceError = formatError(error);
   }
 
-  try {
-    const skillStats = await applyHitterSkillAdjustments(rows, { date });
-    cacheStats.hitterSkillAdjustment = skillStats.status;
-    cacheStats.hitterSkillModelVersion = skillStats.modelVersion;
-    cacheStats.hitterSkillMatched = skillStats.matched;
-    cacheStats.hitterSkillAdjusted = skillStats.adjusted;
-    cacheStats.hitterSkillTotal = skillStats.totalHitters;
-  } catch (error) {
-    cacheStats.hitterSkillAdjustment = 'unavailable';
-    cacheStats.hitterSkillError = formatError(error);
-    for (const row of rows) {
-      row.baselineExpectedPoints = row.expectedPoints;
-      row.skillAdjustedPoints = row.expectedPoints;
-      row.skillAdjustment = 0;
-    }
-  }
-
   const draftKings = await loadDraftKingsSalaries(date);
   if (draftKings?.rows?.length) {
     const salaryStats = mergeDraftKingsSalaries(rows, draftKings.rows);
@@ -271,6 +255,92 @@ export async function getPlayerProjectionSlate({
     cache: cacheStats,
     refreshedAt: new Date().toISOString(),
   };
+}
+
+// Raw simulated players (with FanGraphs averages and marginal histograms) for a
+// date, reusing the same schedule fetch and per-sim cache as the slate builders.
+// Used by the Pick6 higher/lower analysis, which needs histograms rather than
+// the table-ready aggregate rows.
+export async function getSimPlayersForDate({
+  date,
+  projectionSystem = DEFAULT_PROJECTION_SYSTEM,
+} = {}) {
+  validateDate(date);
+
+  const games = await fetchFangraphsGames(date);
+  const players = [];
+  const gameSummaries = [];
+  const cacheStats = { simsHit: 0, simsMiss: 0 };
+
+  for (const game of games) {
+    const schedule = game.schedule || {};
+    const simId = getSimId(schedule, date);
+    if (!simId) continue;
+
+    const loaded = await loadGameSimulation({
+      simId,
+      projectionSystem,
+      gameTimeUtc: schedule.GameDateTimeUTC,
+      date,
+    });
+    const sim = loaded.sim;
+    bumpSimCacheStats(cacheStats, loaded.status);
+
+    const gameKey = schedule.MLBGameId ?? game.MLBGameId ?? schedule.GameId ?? game.GameId ?? simId;
+    gameSummaries.push({
+      gameKey,
+      simId,
+      awayTeamAbbrev: schedule.AwayTeamAbbName || '',
+      homeTeamAbbrev: schedule.HomeTeamAbbName || '',
+      gameTimeUtc: schedule.GameDateTimeUTC || '',
+      displayTime: formatDisplayTime(schedule.GameDateTimeUTC),
+    });
+
+    const sides = [
+      { team: sim?.away, teamAbbrev: schedule.AwayTeamAbbName || '', opponentAbbrev: schedule.HomeTeamAbbName || '' },
+      { team: sim?.home, teamAbbrev: schedule.HomeTeamAbbName || '', opponentAbbrev: schedule.AwayTeamAbbName || '' },
+    ];
+
+    for (const side of sides) {
+      const lineupSource = side.team?.lineupSource || '';
+
+      (side.team?.batters || []).forEach((player, index) => {
+        players.push({
+          gameKey,
+          playerType: 'hitter',
+          playerId: player.playerId || '',
+          playerName: player.name || '',
+          teamAbbrev: side.teamAbbrev,
+          opponentAbbrev: side.opponentAbbrev,
+          position: player.position || '',
+          role: '',
+          lineupSlot: index + 1,
+          lineupSource,
+          average: player.average || {},
+          histograms: player.histograms || {},
+        });
+      });
+
+      (side.team?.pitchers || []).forEach((player) => {
+        players.push({
+          gameKey,
+          playerType: 'pitcher',
+          playerId: player.playerId || '',
+          playerName: player.name || '',
+          teamAbbrev: side.teamAbbrev,
+          opponentAbbrev: side.opponentAbbrev,
+          position: '',
+          role: player.role || '',
+          lineupSlot: null,
+          lineupSource,
+          average: player.average || {},
+          histograms: player.histograms || {},
+        });
+      });
+    }
+  }
+
+  return { date, projectionSystem, games: gameSummaries, players, cache: cacheStats };
 }
 
 export async function getDraftKingsSlates({ date } = {}) {
@@ -473,6 +543,66 @@ async function fetchGameSimulation(simId, projectionSystem) {
     'user-agent': 'dfs-baseball-projections/1.0',
     referer: `${FANGRAPHS_BASE_URL}/lab/baseball-sim`,
   });
+}
+
+// Freshness-aware sim loader shared by every slate builder. Cached payloads
+// for started games are returned as-is forever; pregame payloads older than
+// PREGAME_SIM_TTL_MS are refetched so anticipated starters and lineups track
+// FanGraphs' updates. A failed refresh falls back to the stale payload.
+// Status: 'hit' | 'miss' | 'refreshed' | 'stale'.
+async function loadGameSimulation({ simId, projectionSystem, gameTimeUtc, date }) {
+  const cachePath = simCachePath(projectionSystem, simId);
+  const cached = await getCachedJson(cachePath);
+
+  if (cached) {
+    const startMs = Date.parse(gameTimeUtc || '');
+    const gameStarted = Number.isFinite(startMs)
+      ? startMs <= Date.now()
+      : !date || date < currentEasternDate();
+    if (gameStarted) return { sim: cached, status: 'hit' };
+
+    const cachedAtMs = await cachedFileTimeMs(cachePath);
+    if (cachedAtMs != null && Date.now() - cachedAtMs <= PREGAME_SIM_TTL_MS) {
+      return { sim: cached, status: 'hit' };
+    }
+
+    try {
+      const sim = await fetchGameSimulation(simId, projectionSystem);
+      await writeCachedJson(cachePath, sim);
+      return { sim, status: 'refreshed' };
+    } catch {
+      return { sim: cached, status: 'stale' };
+    }
+  }
+
+  const sim = await fetchGameSimulation(simId, projectionSystem);
+  await writeCachedJson(cachePath, sim);
+  return { sim, status: 'miss' };
+}
+
+function bumpSimCacheStats(stats, status) {
+  if (status === 'hit') stats.simsHit += 1;
+  else if (status === 'miss') stats.simsMiss += 1;
+  else if (status === 'refreshed') stats.simsRefreshed = (stats.simsRefreshed || 0) + 1;
+  else if (status === 'stale') stats.simsStale = (stats.simsStale || 0) + 1;
+}
+
+async function cachedFileTimeMs(path) {
+  try {
+    return (await statFile(path)).mtimeMs;
+  } catch {
+    return null;
+  }
+}
+
+// MLB slates are dated by US Eastern local time.
+function currentEasternDate() {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/New_York',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(Date.now());
 }
 
 export async function runCustomProjection({
@@ -1365,7 +1495,7 @@ function draftKingsMatchKey(name, teamAbbrev) {
   return normalizedName && normalizedTeam ? `${normalizedName}|${normalizedTeam}` : '';
 }
 
-function normalizePlayerName(value) {
+export function normalizePlayerName(value) {
   return String(value || '')
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
@@ -1384,7 +1514,7 @@ function stat(average, key) {
   return roundStat(average?.[key] ?? 0);
 }
 
-function histogramProbability(histogram, predicate) {
+export function histogramProbability(histogram, predicate) {
   const buckets = histogram?.buckets;
   const total = Number(histogram?.total);
   if (!buckets || !Number.isFinite(total) || total <= 0) return 0;
@@ -1703,7 +1833,7 @@ function expectedRoiFromAmerican(winPct, odds) {
   return round6(winPct * profit - (1 - winPct));
 }
 
-function normalizeTeam(abbrev = '') {
+export function normalizeTeam(abbrev = '') {
   const upper = String(abbrev).trim().toUpperCase();
   return TEAM_ALIASES.get(upper) || upper;
 }

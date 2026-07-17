@@ -11,6 +11,7 @@ import {
   getProjectionSlate,
   runCustomProjection,
 } from './projections-data.js';
+import { getPick6Analysis } from './pick6-data.js';
 
 const PORT = Number(process.env.PORT || 8000);
 const MAX_PORT_ATTEMPTS = 10;
@@ -45,6 +46,11 @@ const server = createServer(async (request, response) => {
 
     if (request.method === 'GET' && url.pathname === '/api/draftkings-slates') {
       await handleDraftKingsSlates(url, response);
+      return;
+    }
+
+    if (request.method === 'GET' && url.pathname === '/api/pick6-board') {
+      await handlePick6Board(url, response);
       return;
     }
 
@@ -154,6 +160,27 @@ async function handleDraftKingsSlates(url, response) {
       error: formatError(error),
       phase: 'draftkings-slates',
       hint: 'The server is running, but the DraftKings lobby request failed.',
+    });
+  }
+}
+
+async function handlePick6Board(url, response) {
+  const date = String(url.searchParams.get('date') || '').trim();
+  const projectionSystem = String(url.searchParams.get('projectionSystem') || 'rSteamer').trim();
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    sendJson(response, 400, { error: 'Use a date in YYYY-MM-DD format.' });
+    return;
+  }
+
+  try {
+    const result = await getPick6Analysis({ date, projectionSystem });
+    sendJson(response, 200, result);
+  } catch (error) {
+    sendJson(response, 502, {
+      error: formatError(error),
+      phase: 'pick6-board',
+      hint: 'The server is running, but the DraftKings Pick6 board request failed.',
     });
   }
 }

@@ -28,34 +28,7 @@ export function simulateHitterOutcomes({
   let scoreSum = 0;
 
   for (let index = 0; index < count; index += 1) {
-    // Shared latent factors retain realistic positive correlation between a
-    // hitter's scoring events while every stat still follows its FanGraphs
-    // marginal histogram for this particular matchup and batting-order slot.
-    const gameQuality = normal(random);
-    const power = 0.45 * gameQuality + Math.sqrt(1 - 0.45 ** 2) * normal(random);
-    const speed = 0.20 * gameQuality + Math.sqrt(1 - 0.20 ** 2) * normal(random);
-
-    const singles = sampleMarginal(samplers['1B'], latentUniform(gameQuality, random, 0.42), avg.singles);
-    const doubles = sampleMarginal(samplers['2B'], latentUniform(0.72 * gameQuality + 0.28 * power, random, 0.38), avg.doubles);
-    const triples = sampleMarginal(samplers['3B'], latentUniform(0.45 * gameQuality + 0.55 * speed, random, 0.30), avg.triples);
-    const homeRuns = sampleMarginal(samplers.HR, latentUniform(power, random, 0.48), avg.homeRuns);
-    const walks = sampleMarginal(samplers.BB, latentUniform(gameQuality, random, 0.25), avg.walks);
-    const hitByPitch = sampleMarginal(samplers.HBP, latentUniform(gameQuality, random, 0.10), avg.hitByPitch);
-    const runs = sampleMarginal(samplers.R, latentUniform(0.82 * gameQuality + 0.18 * speed, random, 0.58), avg.runs);
-    const runsBattedIn = sampleMarginal(samplers.RBI, latentUniform(0.68 * gameQuality + 0.32 * power, random, 0.58), avg.runsBattedIn);
-    const stolenBases = sampleMarginal(samplers.SB, latentUniform(0.45 * gameQuality + 0.55 * speed, random, 0.42), avg.stolenBases);
-
-    const rawScore = scoreDraftKingsHitterLine({
-      singles,
-      doubles,
-      triples,
-      homeRuns,
-      runs,
-      runsBattedIn,
-      walks,
-      hitByPitch,
-      stolenBases,
-    });
+    const rawScore = scoreDraftKingsHitterLine(sampleHitterGame(samplers, avg, random));
     // Historical calibration is applied only to nonzero outcomes. Hitter
     // scoring has a real zero floor, so an additive shift must not create
     // impossible negative DraftKings scores.
@@ -118,6 +91,104 @@ export function scoreDraftKingsHitterLine({
     + Number(hitByPitch) * 2
     + Number(stolenBases) * 5,
   );
+}
+
+// Per-game composite-stat distributions for pick'em style lines (e.g. DraftKings
+// Pick6 Hits + Runs + RBIs). Uses the same correlated latent-factor sampling as
+// simulateHitterOutcomes so composite counts respect the positive correlation
+// between a hitter's scoring events. Single-stat lines should instead be read
+// directly from the FanGraphs marginal histograms, which are exact.
+export function simulateHitterCompositePmfs({
+  playerId = '',
+  date = '',
+  average = {},
+  histograms = {},
+  simulations = DEFAULT_SIMULATIONS,
+} = {}) {
+  const count = Math.max(1000, Math.floor(Number(simulations) || DEFAULT_SIMULATIONS));
+  const random = mulberry32(hashString(`${date}|${playerId}|${count}|hitter-composites-v1`));
+  const samplers = histogramSamplers(histograms);
+  const avg = {
+    singles: stat(average, '1B'),
+    doubles: stat(average, '2B'),
+    triples: stat(average, '3B'),
+    homeRuns: stat(average, 'HR'),
+    walks: stat(average, 'BB'),
+    hitByPitch: stat(average, 'HBP'),
+    runs: stat(average, 'R'),
+    runsBattedIn: stat(average, 'RBI'),
+    stolenBases: stat(average, 'SB'),
+  };
+
+  const tallies = {
+    hitsRunsRbi: [],
+    runsRbi: [],
+    totalBases: [],
+    hits: [],
+    extraBaseHits: [],
+    fantasyPoints: [],
+  };
+  const sums = { hitsRunsRbi: 0, runsRbi: 0, totalBases: 0, hits: 0, extraBaseHits: 0, fantasyPoints: 0 };
+
+  for (let index = 0; index < count; index += 1) {
+    const game = sampleHitterGame(samplers, avg, random);
+    const hits = game.singles + game.doubles + game.triples + game.homeRuns;
+    const outcomes = {
+      hits,
+      hitsRunsRbi: hits + game.runs + game.runsBattedIn,
+      runsRbi: game.runs + game.runsBattedIn,
+      totalBases: game.singles + 2 * game.doubles + 3 * game.triples + 4 * game.homeRuns,
+      extraBaseHits: game.doubles + game.triples + game.homeRuns,
+      // Every DraftKings hitter scoring weight is an integer, so points can be
+      // tallied on an integer pmf like the counting stats.
+      fantasyPoints: scoreDraftKingsHitterLine(game),
+    };
+    for (const [key, value] of Object.entries(outcomes)) {
+      tallies[key][value] = (tallies[key][value] || 0) + 1;
+      sums[key] += value;
+    }
+  }
+
+  const pmfs = {};
+  const means = {};
+  for (const key of Object.keys(tallies)) {
+    pmfs[key] = Array.from(tallies[key], (tally) => (tally || 0) / count);
+    means[key] = round(sums[key] / count, 4);
+  }
+
+  return { simulationCount: count, pmfs, means };
+}
+
+// P(stat > line) from a pmf indexed by integer outcome counts.
+export function pmfProbabilityOver(pmf, line) {
+  const threshold = Number(line);
+  if (!Array.isArray(pmf) || !Number.isFinite(threshold)) return null;
+  let probability = 0;
+  for (let value = 0; value < pmf.length; value += 1) {
+    if (value > threshold) probability += pmf[value] || 0;
+  }
+  return probability;
+}
+
+function sampleHitterGame(samplers, avg, random) {
+  // Shared latent factors retain realistic positive correlation between a
+  // hitter's scoring events while every stat still follows its FanGraphs
+  // marginal histogram for this particular matchup and batting-order slot.
+  const gameQuality = normal(random);
+  const power = 0.45 * gameQuality + Math.sqrt(1 - 0.45 ** 2) * normal(random);
+  const speed = 0.20 * gameQuality + Math.sqrt(1 - 0.20 ** 2) * normal(random);
+
+  return {
+    singles: sampleMarginal(samplers['1B'], latentUniform(gameQuality, random, 0.42), avg.singles),
+    doubles: sampleMarginal(samplers['2B'], latentUniform(0.72 * gameQuality + 0.28 * power, random, 0.38), avg.doubles),
+    triples: sampleMarginal(samplers['3B'], latentUniform(0.45 * gameQuality + 0.55 * speed, random, 0.30), avg.triples),
+    homeRuns: sampleMarginal(samplers.HR, latentUniform(power, random, 0.48), avg.homeRuns),
+    walks: sampleMarginal(samplers.BB, latentUniform(gameQuality, random, 0.25), avg.walks),
+    hitByPitch: sampleMarginal(samplers.HBP, latentUniform(gameQuality, random, 0.10), avg.hitByPitch),
+    runs: sampleMarginal(samplers.R, latentUniform(0.82 * gameQuality + 0.18 * speed, random, 0.58), avg.runs),
+    runsBattedIn: sampleMarginal(samplers.RBI, latentUniform(0.68 * gameQuality + 0.32 * power, random, 0.58), avg.runsBattedIn),
+    stolenBases: sampleMarginal(samplers.SB, latentUniform(0.45 * gameQuality + 0.55 * speed, random, 0.42), avg.stolenBases),
+  };
 }
 
 function histogramSamplers(histograms) {
